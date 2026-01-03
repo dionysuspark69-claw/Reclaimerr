@@ -1,0 +1,359 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import niquests
+
+
+@dataclass(slots=True, frozen=True)
+class SonarrSeason:
+    """Sonarr season representation."""
+
+    season_number: int
+    monitored: bool
+    statistics: dict | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class SonarrSeries:
+    """Sonarr series representation."""
+
+    id: int
+    title: str
+    tvdb_id: int | None
+    imdb_id: str | None
+    year: int | None
+    path: str
+    monitored: bool
+    season_count: int
+    seasons: list[SonarrSeason]
+    tags: list[int]
+    raw: dict | None = None
+
+    def __repr__(self) -> str:
+        return (
+            f"SonarrSeries(id={self.id}, title='{self.title}', tvdb_id={self.tvdb_id}, "
+            f"year={self.year}, seasons={self.season_count}, monitored={self.monitored}, tags={self.tags})"
+        )
+
+
+def build_sonarr_series_from_dict(data: dict) -> SonarrSeries:
+    """Build SonarrSeries from API response dict."""
+    seasons_data = data.get("seasons", [])
+    seasons = [
+        SonarrSeason(
+            season_number=s.get("seasonNumber", 0),
+            monitored=s.get("monitored", False),
+            statistics=s.get("statistics"),
+        )
+        for s in seasons_data
+    ]
+
+    return SonarrSeries(
+        id=data["id"],
+        title=data.get("title", ""),
+        tvdb_id=data.get("tvdbId"),
+        imdb_id=data.get("imdbId"),
+        year=data.get("year"),
+        path=data.get("path", ""),
+        monitored=data.get("monitored", False),
+        season_count=len(seasons),
+        seasons=seasons,
+        tags=data.get("tags", []),
+        raw=data,
+    )
+
+
+@dataclass(slots=True, frozen=True)
+class SonarrTag:
+    """Sonarr tag representation."""
+
+    id: int
+    label: str
+
+
+class SonarrClient:
+    """Client for Sonarr API operations."""
+
+    def __init__(self, api_key: str, base_url: str) -> None:
+        """Initialize Sonarr client.
+
+        Args:
+            api_key: Sonarr API key
+            base_url: Sonarr server URL
+        """
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self.session = niquests.Session()
+        self.session.headers.update(
+            {
+                "X-Api-Key": self.api_key,
+                "Content-Type": "application/json",
+            }
+        )
+
+    def __del__(self) -> None:
+        """Close session on cleanup."""
+        if self.session:
+            self.session.close()
+
+    def _make_request(
+        self, method: str, endpoint: str, **kwargs
+    ) -> tuple[int, dict | list | None]:
+        """Make HTTP request to Sonarr API.
+
+        Returns:
+            Tuple of (status_code, response_data)
+        """
+        response = self.session.request(
+            method, f"{self.base_url}/api/v3/{endpoint}", **kwargs
+        )
+        response.raise_for_status()
+
+        status_code = response.status_code
+        assert status_code is not None, "Status code should not be None"
+
+        if response.content:
+            return status_code, response.json()
+        return status_code, None
+
+    def get_series(self, series_id: int) -> SonarrSeries:
+        """Get series by ID.
+
+        Args:
+            series_id: Series ID
+
+        Returns:
+            Series object
+        """
+        status_code, data = self._make_request("GET", f"series/{series_id}")
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Invalid response for series {series_id} (status: {status_code})"
+            )
+        return build_sonarr_series_from_dict(data)
+
+    def get_all_series(self) -> list[SonarrSeries]:
+        """Get all series from Sonarr.
+
+        Returns:
+            List of all series
+        """
+        _, data = self._make_request("GET", "series")
+        if not isinstance(data, list):
+            return []
+        return [build_sonarr_series_from_dict(series) for series in data]
+
+    def get_tags(self) -> list[SonarrTag]:
+        """Get all tags from Sonarr.
+
+        Returns:
+            List of all tags
+        """
+        _, data = self._make_request("GET", "tag")
+        if not isinstance(data, list):
+            return []
+        return [SonarrTag(id=tag["id"], label=tag["label"]) for tag in data]
+
+    def create_tag(self, label: str) -> SonarrTag:
+        """Create a new tag.
+
+        Args:
+            label: Tag name
+
+        Returns:
+            Created tag
+        """
+        status_code, data = self._make_request("POST", "tag", json={"label": label})
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Invalid response when creating tag {label} (status: {status_code})"
+            )
+        return SonarrTag(id=data["id"], label=data["label"])
+
+    def get_or_create_tag(self, label: str) -> SonarrTag:
+        """Get existing tag by label or create if doesn't exist.
+
+        Args:
+            label: Tag name
+
+        Returns:
+            Tag object
+        """
+        tags = self.get_tags()
+        for tag in tags:
+            if tag.label.lower() == label.lower():
+                return tag
+        return self.create_tag(label)
+
+    def add_tag_to_series(
+        self, series_ids: list[int], tag_id: int
+    ) -> list[SonarrSeries]:
+        """Add a tag to multiple series (preserves existing tags).
+
+        Args:
+            series_ids: List of Series IDs
+            tag_id: Tag ID to add
+
+        Returns:
+            List of updated series
+        """
+        status_code, data = self._make_request(
+            "PUT",
+            "series/editor",
+            json={
+                "seriesIds": series_ids,
+                "tags": [tag_id],
+                "applyTags": "add",
+            },
+        )
+
+        if not isinstance(data, list):
+            raise ValueError(
+                f"Invalid response updating series {series_ids} (status: {status_code})"
+            )
+
+        return [
+            build_sonarr_series_from_dict(updated_series) for updated_series in data
+        ]
+
+    def delete_series(
+        self,
+        series_id: int,
+        delete_files: bool = True,
+        add_import_exclusion: bool = False,
+    ) -> None:
+        """Delete a single series.
+
+        Args:
+            series_id: Series ID to delete
+            delete_files: Whether to delete series files from disk
+            add_import_exclusion: Whether to add to import exclusion list
+        """
+        params = {
+            "deleteFiles": str(delete_files).lower(),
+            "addImportListExclusion": str(add_import_exclusion).lower(),
+        }
+        status_code, _ = self._make_request(
+            "DELETE",
+            f"series/{series_id}",
+            params=params,
+        )
+        if status_code != 200:
+            raise ValueError(
+                f"Failed to delete series {series_id} (status: {status_code})"
+            )
+
+    def delete_series_bulk(
+        self,
+        series_ids: list[int],
+        delete_files: bool = True,
+        add_import_exclusion: bool = False,
+    ) -> None:
+        """Delete multiple series at once.
+
+        Args:
+            series_ids: List of series IDs to delete
+            delete_files: Whether to delete series files from disk
+            add_import_exclusion: Whether to add to import exclusion list
+        """
+        status_code, _ = self._make_request(
+            "DELETE",
+            "series/editor",
+            json={
+                "seriesIds": series_ids,
+                "deleteFiles": delete_files,
+                "addImportListExclusion": add_import_exclusion,
+            },
+        )
+        if status_code != 200:
+            raise ValueError(
+                f"Failed to delete series {series_ids} (status: {status_code})"
+            )
+
+    def update_season_monitoring(
+        self,
+        series_id: int,
+        season_number: int,
+        monitored: bool,
+    ) -> SonarrSeries:
+        """Update monitoring status for a specific season.
+
+        Args:
+            series_id: Series ID
+            season_number: Season number
+            monitored: Whether to monitor this season
+
+        Returns:
+            Updated series
+        """
+        # get current series data
+        status_code, series_data = self._make_request("GET", f"series/{series_id}")
+        if not isinstance(series_data, dict):
+            raise ValueError(
+                f"Invalid response for series {series_id} (status: {status_code})"
+            )
+
+        # update the specific season's monitoring status
+        seasons = series_data.get("seasons", [])
+        for season in seasons:
+            if season.get("seasonNumber") == season_number:
+                season["monitored"] = monitored
+                break
+
+        # update the series
+        status_code, updated_data = self._make_request(
+            "PUT",
+            f"series/{series_id}",
+            json=series_data,
+        )
+        if not isinstance(updated_data, dict):
+            raise ValueError(
+                f"Invalid response updating series {series_id} (status: {status_code})"
+            )
+
+        return build_sonarr_series_from_dict(updated_data)
+
+    def delete_season_files(
+        self,
+        series_id: int,
+        season_number: int,
+    ) -> None:
+        """Delete all episode files for a specific season.
+
+        Args:
+            series_id: Series ID
+            season_number: Season number to delete files from
+        """
+        # get all episodes for this series
+        status_code, episodes = self._make_request(
+            "GET",
+            "episode",
+            params={"seriesId": series_id},
+        )
+        if not isinstance(episodes, list):
+            raise ValueError(
+                f"Invalid response getting episodes for series {series_id} (status: {status_code})"
+            )
+
+        # filter to episodes in the specified season that have files
+        episode_file_ids = [
+            ep.get("episodeFileId")
+            for ep in episodes
+            if ep.get("seasonNumber") == season_number
+            and ep.get("episodeFileId") is not None
+        ]
+
+        if not episode_file_ids:
+            return
+
+        # delete the episode files in bulk
+        status_code, _ = self._make_request(
+            "DELETE",
+            "episodefile/bulk",
+            json={"episodeFileIds": episode_file_ids},
+        )
+        if status_code != 200:
+            raise ValueError(
+                f"Failed to delete season {season_number} files for series {series_id} (status: {status_code})"
+            )
