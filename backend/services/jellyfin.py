@@ -6,6 +6,8 @@ from typing import Any
 
 import niquests
 
+from backend.enums import Service
+
 from .models import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
 
 
@@ -312,6 +314,7 @@ class JellyfinBackend:
                         "name": movie.name,
                         "year": movie.year,
                         "library_name": movie.library_name,
+                        "service": Service.JELLYFIN,
                         "added_at": movie.date_created,
                         "premiere_date": movie.premiere_date,
                         "container": movie.container,

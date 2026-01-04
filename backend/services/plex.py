@@ -5,6 +5,8 @@ from datetime import datetime
 
 import niquests
 
+from backend.enums import Service
+
 from .models import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
 
 
@@ -226,6 +228,7 @@ class PlexBackend:
                 id=m.id,
                 name=m.name,
                 year=m.year,
+                service=Service.PLEX,
                 library_name=m.library_name,
                 added_at=m.added_at,
                 premiere_date=None,  # plex doesn't provide premiere date directly
