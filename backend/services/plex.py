@@ -92,28 +92,6 @@ class PlexBackend:
                 if item.get("type") != "movie":
                     continue
 
-                # extract external IDs from Guid array if available
-                imdb_id = None
-                tmdb_id = None
-                tvdb_id = None
-
-                guids = item.get("Guid", [])
-                for guid in guids:
-                    guid_id = guid.get("id", "")
-                    if guid_id.startswith("imdb://"):
-                        imdb_id = guid_id.replace("imdb://", "")
-                    elif guid_id.startswith("tmdb://"):
-                        tmdb_id = guid_id.replace("tmdb://", "")
-                    elif guid_id.startswith("tvdb://"):
-                        tvdb_id = guid_id.replace("tvdb://", "")
-
-                external_ids = ExternalIDs(
-                    imdb=imdb_id,
-                    tmdb=tmdb_id,
-                    tmdb_collection=None,
-                    tvdb=tvdb_id,
-                )
-
                 movie = PlexMovie(
                     id=item["ratingKey"],
                     name=item.get("title", ""),
@@ -131,9 +109,7 @@ class PlexBackend:
                     if item.get("lastViewedAt")
                     else None,
                     view_count=item.get("viewCount", 0),
-                    external_ids=external_ids
-                    if any([external_ids.imdb, external_ids.tmdb, external_ids.tvdb])
-                    else None,
+                    external_ids=self._parse_external_ids(item),
                 )
                 all_movies.append(movie)
 
@@ -170,28 +146,6 @@ class PlexBackend:
                 if item.get("type") != "show":
                     continue
 
-                # extract external IDs from Guid array if available
-                imdb_id = None
-                tmdb_id = None
-                tvdb_id = None
-
-                guids = item.get("Guid", [])
-                for guid in guids:
-                    guid_id = guid.get("id", "")
-                    if guid_id.startswith("imdb://"):
-                        imdb_id = guid_id.replace("imdb://", "")
-                    elif guid_id.startswith("tmdb://"):
-                        tmdb_id = guid_id.replace("tmdb://", "")
-                    elif guid_id.startswith("tvdb://"):
-                        tvdb_id = guid_id.replace("tvdb://", "")
-
-                external_ids = ExternalIDs(
-                    imdb=imdb_id,
-                    tmdb=tmdb_id,
-                    tmdb_collection=None,
-                    tvdb=tvdb_id,
-                )
-
                 series = PlexSeries(
                     id=item["ratingKey"],
                     name=item.get("title", ""),
@@ -209,9 +163,7 @@ class PlexBackend:
                     if item.get("lastViewedAt")
                     else None,
                     view_count=item.get("viewCount", 0),
-                    external_ids=external_ids
-                    if any([external_ids.imdb, external_ids.tmdb, external_ids.tvdb])
-                    else None,
+                    external_ids=self._parse_external_ids(item),
                 )
                 all_series.append(series)
 
@@ -264,3 +216,31 @@ class PlexBackend:
             )
             for s in series
         ]
+
+    @staticmethod
+    def _parse_external_ids(media: dict) -> ExternalIDs | None:
+        imdb_id = None
+        tmdb_id = None
+        tvdb_id = None
+
+        guids = media.get("Guid", [])
+        for guid in guids:
+            guid_id = guid.get("id", "")
+            if guid_id.startswith("imdb://"):
+                imdb_id = guid_id.replace("imdb://", "")
+            elif guid_id.startswith("tmdb://"):
+                tmdb_id = guid_id.replace("tmdb://", "")
+            elif guid_id.startswith("tvdb://"):
+                tvdb_id = guid_id.replace("tvdb://", "")
+
+        if not tmdb_id:
+            return None
+
+        if tmdb_id or imdb_id or tvdb_id:
+            return ExternalIDs(
+                tmdb=tmdb_id,
+                imdb=imdb_id,
+                tmdb_collection=None,
+                tvdb=tvdb_id,
+            )
+        return None

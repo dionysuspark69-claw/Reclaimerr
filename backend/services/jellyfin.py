@@ -161,9 +161,7 @@ class JellyfinBackend:
                 imdb=item["ProviderIds"].get("Imdb")
                 if item.get("ProviderIds")
                 else None,
-                tmdb=item["ProviderIds"].get("Tmdb")
-                if item.get("ProviderIds")
-                else None,
+                tmdb=item["ProviderIds"].get("Tmdb"),
                 tmdb_collection=item["ProviderIds"].get("TmdbCollection")
                 if item.get("ProviderIds")
                 else None,
@@ -227,9 +225,7 @@ class JellyfinBackend:
                 imdb=item["ProviderIds"].get("Imdb")
                 if item.get("ProviderIds")
                 else None,
-                tmdb=item["ProviderIds"].get("Tmdb")
-                if item.get("ProviderIds")
-                else None,
+                tmdb=item["ProviderIds"].get("Tmdb"),
                 tmdb_collection=item["ProviderIds"].get("TmdbCollection")
                 if item.get("ProviderIds")
                 else None,
