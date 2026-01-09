@@ -119,6 +119,14 @@ class JellyfinBackend:
 
         return "Unknown"
 
+    def health(self):
+        """Check Jellyfin server health and API key."""
+        try:
+            status = self._make_request("System/Info")
+            return True if status.get("ServerName") else False
+        except Exception:
+            return False
+
     def get_users(self) -> list[JellyfinUser]:
         """Get all Jellyfin users."""
         users_data = self._make_request("Users")
