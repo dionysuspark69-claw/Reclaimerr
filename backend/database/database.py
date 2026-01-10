@@ -1,20 +1,28 @@
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.ext.asyncio.session import AsyncSession
 
-from backend.core.config import Conf
+from backend.core.settings import settings
 from backend.database.models import Base
 
-# create async engine
 engine = create_async_engine(
-    f"sqlite+aiosqlite:///{Conf.db_path}",
+    f"sqlite+aiosqlite:///{settings.db_path}",
     echo=False,
     future=True,
 )
 
-# create async session factory
-AsyncSessionLocal = async_sessionmaker[AsyncSession](
+
+@event.listens_for(engine.sync_engine, "connect")
+def set_sqlite_pragma(dbapi_conn, _connection_record):
+    """Set SQLite PRAGMA settings on each connection."""
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.close()
+
+
+async_db = async_sessionmaker[AsyncSession](
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
@@ -32,7 +40,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         async def get_items(db: AsyncSession = Depends(get_db)):
             ...
     """
-    async with AsyncSessionLocal() as session:
+    async with async_db() as session:
         try:
             yield session
             await session.commit()
@@ -44,10 +52,15 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db():
-    """
-    Initialize database tables.
-    Creates all tables defined in models.
-    """
-
+    """Initialize database tables and set WAL mode."""
     async with engine.begin() as conn:
+        await conn.exec_driver_sql("PRAGMA journal_mode=WAL")
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def close_db():
+    """
+    Close database connections and dispose of the engine.
+    Should be called during application shutdown.
+    """
+    await engine.dispose()
