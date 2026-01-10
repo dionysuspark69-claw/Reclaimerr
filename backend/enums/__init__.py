@@ -1,4 +1,4 @@
-from enum import StrEnum, auto
+from enum import Enum, StrEnum, auto
 
 
 class Service(StrEnum):
@@ -24,3 +24,11 @@ class TaskStatus(StrEnum):
     RUNNING = auto()
     COMPLETED = auto()
     FAILED = auto()
+
+
+class SeerrRequestStatus(Enum):
+    "https://github.com/seerr-team/seerr/blob/develop/seerr-api.yml"
+
+    PENDING = 1
+    APPROVED = 2
+    DECLINED = 3
