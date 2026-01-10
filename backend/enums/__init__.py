@@ -1,7 +1,7 @@
-from enum import Enum, auto
+from enum import StrEnum, auto
 
 
-class Service(Enum):
+class Service(StrEnum):
     SONARR = auto()
     RADARR = auto()
     JELLYFIN = auto()
@@ -9,17 +9,17 @@ class Service(Enum):
     SEERR = auto()
 
 
-class MediaType(Enum):
+class MediaType(StrEnum):
     MOVIE = auto()
     SERIES = auto()
 
 
-class SeriesStatus(Enum):
+class SeriesStatus(StrEnum):
     CONTINUING = auto()
     ENDED = auto()
 
 
-class TaskStatus(Enum):
+class TaskStatus(StrEnum):
     PENDING = auto()
     RUNNING = auto()
     COMPLETED = auto()
