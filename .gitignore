@@ -1,0 +1,24 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.python-version
+
+# Virtual environments
+.venv
+
+# Environment variables
+.env
+
+# Runtime/config directories
+runtime/
+config.toml
+
+# Logs
+*.log
+
+# clients
+.vscode
