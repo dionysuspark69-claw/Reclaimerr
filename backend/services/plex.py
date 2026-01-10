@@ -6,8 +6,7 @@ from datetime import datetime
 import niquests
 
 from backend.enums import Service
-
-from .models import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
+from backend.models.media import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
 
 
 @dataclass(slots=True, frozen=True)
