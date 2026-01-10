@@ -48,7 +48,8 @@ class RadarrClient:
         response.raise_for_status()
 
         status_code = response.status_code
-        assert status_code is not None, "Status code should not be None"
+        if not status_code:
+            raise ValueError("Status code should not be None")
 
         if response.content:
             return status_code, response.json()
