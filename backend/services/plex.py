@@ -71,19 +71,19 @@ class PlexBackend:
         return data.get("MediaContainer", {}).get("Directory", [])  # pyright: ignore [reportAttributeAccessIssue]
 
     async def get_movies(
-        self, exclude_libraries: list[str] | None = None
+        self, included_libraries: list[str] | None = None
     ) -> list[PlexMovie]:
         """Get all movies from all movie libraries.
 
         Args:
-            exclude_libraries: List of library names to exclude (e.g., ['Other Videos'])
+            included_libraries: List of library names to include (None for all)
         """
         sections = await self.get_library_sections()
         movie_sections = [s for s in sections if s.get("type") == "movie"]
 
-        if exclude_libraries:
+        if included_libraries:
             movie_sections = [
-                s for s in movie_sections if s.get("title") not in exclude_libraries
+                s for s in movie_sections if s.get("title") in included_libraries
             ]
 
         all_movies = []
@@ -129,19 +129,19 @@ class PlexBackend:
         return all_movies
 
     async def get_series(
-        self, exclude_sections: list[str] | None = None
+        self, included_sections: list[str] | None = None
     ) -> list[PlexSeries]:
         """Get all TV series from all show libraries.
 
         Args:
-            exclude_sections: List of section names to exclude
+            included_sections: List of section names to include (None for all)
         """
         sections = await self.get_library_sections()
         show_sections = [s for s in sections if s.get("type") == "show"]
 
-        if exclude_sections:
+        if included_sections:
             show_sections = [
-                s for s in show_sections if s.get("title") not in exclude_sections
+                s for s in show_sections if s.get("title") in included_sections
             ]
 
         all_series = []
@@ -187,10 +187,10 @@ class PlexBackend:
         return all_series
 
     async def get_aggregated_movies(
-        self, exclude_libraries: list[str] | None = None
+        self, included_libraries: list[str] | None = None
     ) -> list[AggregatedMovieData]:
-        """Get aggregated movie data with optional section exclusion."""
-        movies = await self.get_movies(exclude_libraries=exclude_libraries)
+        """Get aggregated movie data with optional section inclusion."""
+        movies = await self.get_movies(included_libraries=included_libraries)
 
         return [
             AggregatedMovieData(
@@ -212,10 +212,10 @@ class PlexBackend:
         ]
 
     async def get_aggregated_series(
-        self, exclude_sections: list[str] | None = None
+        self, included_sections: list[str] | None = None
     ) -> list[AggregatedSeriesData]:
-        """Get aggregated series data with optional section exclusion."""
-        series = await self.get_series(exclude_sections=exclude_sections)
+        """Get aggregated series data with optional section inclusion."""
+        series = await self.get_series(included_sections=included_sections)
 
         return [
             AggregatedSeriesData(

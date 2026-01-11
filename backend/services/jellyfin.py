@@ -299,17 +299,17 @@ class JellyfinBackend:
             return {}
 
     async def get_aggregated_movies(
-        self, exclude_libraries: list[str] | None = None
+        self, included_libraries: list[str] | None = None
     ) -> list[AggregatedMovieData]:
-        """Get aggregated movie data across all users with optional library exclusion."""
+        """Get aggregated movie data across all users with optional library filters."""
         movie_data: dict[str, dict[str, Any]] = {}
 
         for user in await self.get_users():
             user_movies = await self.get_movies_for_user(user.id)
 
             for movie in user_movies:
-                # skip if library is in exclusion list
-                if exclude_libraries and movie.library_name in exclude_libraries:
+                # skip if library is not in inclusion list
+                if included_libraries and movie.library_name not in included_libraries:
                     continue
 
                 if movie.id not in movie_data:
@@ -360,9 +360,9 @@ class JellyfinBackend:
         ]
 
     async def get_aggregated_series(
-        self, exclude_libraries: list[str] | None = None
+        self, included_libraries: list[str] | None = None
     ) -> list[AggregatedSeriesData]:
-        """Get aggregated series data across all users with optional library exclusion.
+        """Get aggregated series data across all users with optional library inclusion.
 
         Note: Jellyfin doesn't populate LastPlayedDate at the series level, so we check
         episodes to get accurate watch dates. We optimize by getting all watched episodes
@@ -380,8 +380,8 @@ class JellyfinBackend:
             user_series = await self.get_series_for_user(user.id)
 
             for series in user_series:
-                # skip if library is in exclusion list
-                if exclude_libraries and series.library_name in exclude_libraries:
+                # skip if library is not in inclusion list
+                if included_libraries and series.library_name not in included_libraries:
                     continue
 
                 # get watch date from our pre-fetched data
