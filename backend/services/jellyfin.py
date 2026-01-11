@@ -29,10 +29,8 @@ class JellyfinBackend:
                 "accept": "application/json",
             }
         )
-        # cache library information - map folder IDs to library names
-        self._library_cache: dict[str, str] = {}
-        # cache of virtual folders for path-based lookup
-        self._virtual_folders: list[dict] | None = None
+        # cache of library ID to library name mapping
+        self._library_map: dict[str, str] | None = None
 
     async def _make_request(
         self, endpoint: str, params: dict | None = None
@@ -64,46 +62,6 @@ class JellyfinBackend:
         # should never reach here, but satisfy type checker
         raise RuntimeError("Max retries exceeded")
 
-    async def _get_virtual_folders(self) -> list[dict]:
-        """Get and cache virtual folders (libraries)."""
-        if self._virtual_folders is None:
-            self._virtual_folders = await self._make_request("Library/VirtualFolders")  # pyright: ignore [reportAttributeAccessIssue]
-        return self._virtual_folders  # pyright: ignore [reportReturnType]
-
-    async def _get_library_name_from_path(self, item_path: str) -> str:
-        """Get library name by matching item path to virtual folder paths."""
-        if not item_path:
-            return "Unknown"
-
-        virtual_folders = await self._get_virtual_folders()
-        for vf in virtual_folders:
-            lib_paths = vf.get("Locations", [])
-            for lib_path in lib_paths:
-                if item_path.startswith(lib_path):
-                    return vf["Name"]
-
-        return "Unknown"
-
-    async def _get_library_name(
-        self, parent_id: str, item_path: str | None = None
-    ) -> str:
-        """Get library name from parent ID and optionally item path, with caching."""
-        # try path-based lookup first if available
-        if item_path:
-            cache_key = f"path:{item_path}"
-            if cache_key in self._library_cache:
-                return self._library_cache[cache_key]
-
-            lib_name = await self._get_library_name_from_path(item_path)
-            self._library_cache[cache_key] = lib_name
-            return lib_name
-
-        # fallback to parent ID lookup
-        if parent_id in self._library_cache:
-            return self._library_cache[parent_id]
-
-        return "Unknown"
-
     async def health(self) -> bool:
         """Check server health and API key."""
         try:
@@ -111,6 +69,26 @@ class JellyfinBackend:
             return True
         except Exception:
             return False
+
+    async def _get_media_libraries(self, media_type: str) -> list[dict[str, str]]:
+        """Get list of media libraries of a specific type with their IDs and names."""
+        virtual_folders = await self._make_request("Library/VirtualFolders")  # pyright: ignore [reportAttributeAccessIssue]
+        media_libs = []
+        for vf in virtual_folders:
+            if vf.get("CollectionType") == media_type:
+                item_id = vf.get("ItemId")
+                name = vf.get("Name")
+                if item_id and name:
+                    media_libs.append({"id": item_id, "name": name})
+        return media_libs
+
+    async def get_movie_libraries(self) -> list[dict[str, str]]:
+        """Get list of movie libraries with their IDs and names."""
+        return await self._get_media_libraries("movies")
+
+    async def get_series_libraries(self) -> list[dict[str, str]]:
+        """Get list of TV series libraries with their IDs and names."""
+        return await self._get_media_libraries("tvshows")
 
     async def get_users(self) -> list[JellyfinUser]:
         """Get all Jellyfin users."""
@@ -120,32 +98,38 @@ class JellyfinBackend:
         return [JellyfinUser(name=user["Name"], id=user["Id"]) for user in users_data]
 
     async def get_movies_for_user(
-        self, user_id: str, filters: dict | None = None
+        self,
+        user_id: str,
+        library_id: str,
+        library_name: str,
+        filters: dict | None = None,
     ) -> list[JellyfinMovie]:
-        """Get all movies for a specific user."""
+        """Get movies for a specific user, optionally filtered by library.
+
+        Args:
+            user_id: The Jellyfin user ID
+            library_id: Library ID to query
+            library_name: The name of the library
+            filters: Additional query filters
+        """
         params = {
             "userId": user_id,
             "includeItemTypes": "Movie",
             "recursive": "true",
             "enableTotalRecordCount": "true",
-            # include Path for accurate library detection and ProviderIds for external IDs
-            "Fields": "Path,ParentId,ProviderIds",
+            "Fields": "ProviderIds",
+            "ParentId": library_id,
         }
+
         if filters:
             params.update(filters)
         get_data = await self._make_request("Items", params=params)
         if not get_data:
             return []
         items_data = get_data.get("Items", [])  # pyright: ignore [reportAttributeAccessIssue]
+
         data = []
         for item in items_data:
-            # get library information using path (most reliable)
-            parent_id = item.get("ParentId")
-            item_path = item.get("Path")
-            library_name = await self._get_library_name(
-                parent_id or "Unknown", item_path
-            )
-
             user_data = JellyfinUserData(
                 id=item["UserData"]["ItemId"],
                 key=item["UserData"]["Key"],
@@ -180,7 +164,7 @@ class JellyfinBackend:
                 if item.get("DateCreated")
                 else None,
                 container=item.get("Container"),
-                library_id=parent_id or "Unknown",
+                library_id=library_id,
                 library_name=library_name,
                 external_ids=external_ids,
                 user_data=user_data,
@@ -189,32 +173,38 @@ class JellyfinBackend:
         return data
 
     async def get_series_for_user(
-        self, user_id: str, filters: dict | None = None
+        self,
+        user_id: str,
+        library_id: str,
+        library_name: str,
+        filters: dict | None = None,
     ) -> list[JellyfinSeries]:
-        """Get all TV series for a specific user."""
+        """Get TV series for a specific user, optionally filtered by library.
+
+        Args:
+            user_id: The Jellyfin user ID
+            library_id: Library ID to query
+            library_name: The name of the library
+            filters: Additional query filters
+        """
         params = {
             "userId": user_id,
             "includeItemTypes": "Series",
             "recursive": "true",
             "enableTotalRecordCount": "true",
-            # include Path for accurate library detection and ProviderIds for external IDs
-            "Fields": "Path,ParentId,ProviderIds",
+            "Fields": "ProviderIds",
+            "ParentId": library_id,
         }
+
         if filters:
             params.update(filters)
         get_data = await self._make_request("Items", params=params)
         if not get_data:
             return []
         items_data = get_data.get("Items", [])  # pyright: ignore [reportAttributeAccessIssue]
+
         data = []
         for item in items_data:
-            # get library information using path (most reliable)
-            parent_id = item.get("ParentId")
-            item_path = item.get("Path")
-            library_name = await self._get_library_name(
-                parent_id or "Unknown", item_path
-            )
-
             user_data = JellyfinUserData(
                 id=item["UserData"]["ItemId"],
                 key=item["UserData"]["Key"],
@@ -248,7 +238,7 @@ class JellyfinBackend:
                 date_created=datetime.fromisoformat(item["DateCreated"])
                 if item.get("DateCreated")
                 else None,
-                library_id=parent_id or "Unknown",
+                library_id=library_id,
                 library_name=library_name,
                 external_ids=external_ids,
                 user_data=user_data,
@@ -304,52 +294,65 @@ class JellyfinBackend:
         """Get aggregated movie data across all users with optional library filters."""
         movie_data: dict[str, dict[str, Any]] = {}
 
-        for user in await self.get_users():
-            user_movies = await self.get_movies_for_user(user.id)
+        # get all movie libraries
+        all_libraries = await self.get_movie_libraries()
 
-            for movie in user_movies:
-                # skip if library is not in inclusion list
-                if included_libraries and movie.library_name not in included_libraries:
-                    continue
+        # filter to included libraries if specified
+        if included_libraries:
+            libraries_to_query = [
+                lib for lib in all_libraries if lib["name"] in included_libraries
+            ]
+        else:
+            libraries_to_query = all_libraries
 
-                if movie.id not in movie_data:
-                    # first time seeing this movie
-                    movie_data[movie.id] = {
-                        "id": movie.id,
-                        "name": movie.name,
-                        "year": movie.year,
-                        "library_name": movie.library_name,
-                        "service": Service.JELLYFIN,
-                        "added_at": movie.date_created,
-                        "premiere_date": movie.premiere_date,
-                        "container": movie.container,
-                        "external_ids": movie.external_ids,
-                        "view_count": movie.user_data.play_count
-                        if movie.user_data
-                        else 0,
-                        "last_viewed_at": movie.user_data.last_played_date
-                        if movie.user_data
-                        else None,
-                        "played_by_user_count": 1
-                        if (movie.user_data and movie.user_data.played)
-                        else 0,
-                    }
-                else:
-                    # aggregate data
-                    existing = movie_data[movie.id]
-                    if movie.user_data:
-                        existing["view_count"] += movie.user_data.play_count
-                        if movie.user_data.last_played_date:
-                            if (
-                                not existing["last_viewed_at"]
-                                or movie.user_data.last_played_date
-                                > existing["last_viewed_at"]
-                            ):
-                                existing["last_viewed_at"] = (
-                                    movie.user_data.last_played_date
-                                )
-                        if movie.user_data.played:
-                            existing["played_by_user_count"] += 1
+        for library in libraries_to_query:
+            library_id = library["id"]
+            library_name = library["name"]
+
+            for user in await self.get_users():
+                user_movies = await self.get_movies_for_user(
+                    user.id, library_id=library_id, library_name=library_name
+                )
+
+                for movie in user_movies:
+                    if movie.id not in movie_data:
+                        # first time seeing this movie
+                        movie_data[movie.id] = {
+                            "id": movie.id,
+                            "name": movie.name,
+                            "year": movie.year,
+                            "library_name": movie.library_name,
+                            "service": Service.JELLYFIN,
+                            "added_at": movie.date_created,
+                            "premiere_date": movie.premiere_date,
+                            "container": movie.container,
+                            "external_ids": movie.external_ids,
+                            "view_count": movie.user_data.play_count
+                            if movie.user_data
+                            else 0,
+                            "last_viewed_at": movie.user_data.last_played_date
+                            if movie.user_data
+                            else None,
+                            "played_by_user_count": 1
+                            if (movie.user_data and movie.user_data.played)
+                            else 0,
+                        }
+                    else:
+                        # aggregate data
+                        existing = movie_data[movie.id]
+                        if movie.user_data:
+                            existing["view_count"] += movie.user_data.play_count
+                            if movie.user_data.last_played_date:
+                                if (
+                                    not existing["last_viewed_at"]
+                                    or movie.user_data.last_played_date
+                                    > existing["last_viewed_at"]
+                                ):
+                                    existing["last_viewed_at"] = (
+                                        movie.user_data.last_played_date
+                                    )
+                            if movie.user_data.played:
+                                existing["played_by_user_count"] += 1
 
         # convert to final format
         return [
@@ -370,53 +373,66 @@ class JellyfinBackend:
         """
         series_data: dict[str, dict[str, Any]] = {}
 
-        for user in await self.get_users():
-            # get all watched episodes for this user in one API call
-            user_series_watch_dates = await self.get_all_watched_episodes_for_user(
-                user.id
-            )
+        # get all TV libraries
+        all_libraries = await self.get_series_libraries()
 
-            # get series list for this user
-            user_series = await self.get_series_for_user(user.id)
+        # filter to included libraries if specified
+        if included_libraries:
+            libraries_to_query = [
+                lib for lib in all_libraries if lib["name"] in included_libraries
+            ]
+        else:
+            libraries_to_query = all_libraries
 
-            for series in user_series:
-                # skip if library is not in inclusion list
-                if included_libraries and series.library_name not in included_libraries:
-                    continue
+        for library in libraries_to_query:
+            library_id = library["id"]
+            library_name = library["name"]
 
-                # get watch date from our pre-fetched data
-                episode_last_watched = user_series_watch_dates.get(series.id)
+            for user in await self.get_users():
+                # get all watched episodes for this user in one API call
+                user_series_watch_dates = await self.get_all_watched_episodes_for_user(
+                    user.id
+                )
 
-                if series.id not in series_data:
-                    # first time seeing this series
-                    series_data[series.id] = {
-                        "id": series.id,
-                        "name": series.name,
-                        "year": series.year,
-                        "library_name": series.library_name,
-                        "added_at": series.date_created,
-                        "premiere_date": series.premiere_date,
-                        "external_ids": series.external_ids,
-                        "view_count": series.user_data.play_count
-                        if series.user_data
-                        else 0,
-                        "last_viewed_at": episode_last_watched,
-                        "played_by_user_count": 1 if episode_last_watched else 0,
-                    }
-                else:
-                    # aggregate data
-                    existing = series_data[series.id]
-                    if series.user_data:
-                        existing["view_count"] += series.user_data.play_count
+                # get series list for this user from this library
+                user_series = await self.get_series_for_user(
+                    user.id, library_id=library_id, library_name=library_name
+                )
 
-                    # update last_viewed_at if this user's episodes were watched more recently
-                    if episode_last_watched:
-                        if (
-                            not existing["last_viewed_at"]
-                            or episode_last_watched > existing["last_viewed_at"]
-                        ):
-                            existing["last_viewed_at"] = episode_last_watched
-                        existing["played_by_user_count"] += 1
+                for series in user_series:
+                    # get watch date from our pre-fetched data
+                    episode_last_watched = user_series_watch_dates.get(series.id)
+
+                    if series.id not in series_data:
+                        # first time seeing this series
+                        series_data[series.id] = {
+                            "id": series.id,
+                            "name": series.name,
+                            "year": series.year,
+                            "library_name": series.library_name,
+                            "added_at": series.date_created,
+                            "premiere_date": series.premiere_date,
+                            "external_ids": series.external_ids,
+                            "view_count": series.user_data.play_count
+                            if series.user_data
+                            else 0,
+                            "last_viewed_at": episode_last_watched,
+                            "played_by_user_count": 1 if episode_last_watched else 0,
+                        }
+                    else:
+                        # aggregate data
+                        existing = series_data[series.id]
+                        if series.user_data:
+                            existing["view_count"] += series.user_data.play_count
+
+                        # update last_viewed_at if this user's episodes were watched more recently
+                        if episode_last_watched:
+                            if (
+                                not existing["last_viewed_at"]
+                                or episode_last_watched > existing["last_viewed_at"]
+                            ):
+                                existing["last_viewed_at"] = episode_last_watched
+                            existing["played_by_user_count"] += 1
 
         # convert to final format
         return [
