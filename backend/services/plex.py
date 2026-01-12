@@ -10,7 +10,7 @@ from backend.models.clients.plex import PlexMovie, PlexSeries
 from backend.models.media import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
 
 
-class PlexBackend:
+class PlexService:
     """Plex media server backend."""
 
     def __init__(self, token: str, plex_url: str) -> None:

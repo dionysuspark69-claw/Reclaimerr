@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from backend.core.logger import LOG
-from backend.services.jellyfin import JellyfinBackend
-from backend.services.plex import PlexBackend
+from backend.services.jellyfin import JellyfinService
+from backend.services.plex import PlexService
 from backend.services.radarr import RadarrClient
 from backend.services.seerr import SeerrClient
 from backend.services.sonarr import SonarrClient
@@ -17,8 +17,8 @@ class ServiceManager:
 
     def __init__(self) -> None:
         """Initialize service manager with no active clients."""
-        self._jellyfin: JellyfinBackend | None = None
-        self._plex: PlexBackend | None = None
+        self._jellyfin: JellyfinService | None = None
+        self._plex: PlexService | None = None
         self._radarr: RadarrClient | None = None
         self._sonarr: SonarrClient | None = None
         self._seerr: SeerrClient | None = None
@@ -26,12 +26,12 @@ class ServiceManager:
         LOG.info("ServiceManager initialized")
 
     @property
-    def jellyfin(self) -> JellyfinBackend | None:
+    def jellyfin(self) -> JellyfinService | None:
         """Get Jellyfin service (must be initialized first)."""
         return self._jellyfin
 
     @property
-    def plex(self) -> PlexBackend | None:
+    def plex(self) -> PlexService | None:
         """Get Plex service (must be initialized first)."""
         return self._plex
 
@@ -52,10 +52,10 @@ class ServiceManager:
 
     async def initialize_jellyfin(
         self, base_url: str, api_key: str
-    ) -> JellyfinBackend | None:
+    ) -> JellyfinService | None:
         """Initialize Jellyfin service with provided config."""
         try:
-            self._jellyfin = JellyfinBackend(
+            self._jellyfin = JellyfinService(
                 api_key=api_key,
                 jellyfin_url=base_url,
             )
@@ -68,10 +68,10 @@ class ServiceManager:
             LOG.error(f"Failed to initialize Jellyfin service: {e}")
             return None
 
-    async def initialize_plex(self, base_url: str, token: str) -> PlexBackend | None:
+    async def initialize_plex(self, base_url: str, token: str) -> PlexService | None:
         """Initialize Plex service with provided config."""
         try:
-            self._plex = PlexBackend(
+            self._plex = PlexService(
                 token=token,
                 plex_url=base_url,
             )

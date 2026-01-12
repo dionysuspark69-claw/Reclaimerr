@@ -16,7 +16,7 @@ from backend.models.clients.jellyfin import (
 from backend.models.media import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
 
 
-class JellyfinBackend:
+class JellyfinService:
     """Jellyfin media server backend."""
 
     def __init__(self, api_key: str, jellyfin_url: str) -> None:
