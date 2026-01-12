@@ -29,6 +29,7 @@ class AggregatedMovieData:
     added_at: datetime | None
     premiere_date: datetime | None
     external_ids: ExternalIDs | None
+    size: int
     # watch data
     view_count: int
     last_viewed_at: datetime | None
@@ -50,6 +51,7 @@ class AggregatedSeriesData:
     added_at: datetime | None
     premiere_date: datetime | None
     external_ids: ExternalIDs | None
+    size: int
     # watch data
     view_count: int
     last_viewed_at: datetime | None

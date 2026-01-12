@@ -38,6 +38,7 @@ class JellyfinMovie:
     library_id: str
     library_name: str
     external_ids: ExternalIDs | None
+    size: int
     user_data: JellyfinUserData | None
 
 
@@ -53,4 +54,5 @@ class JellyfinSeries:
     library_id: str
     library_name: str
     external_ids: ExternalIDs | None
+    size: int
     user_data: JellyfinUserData | None

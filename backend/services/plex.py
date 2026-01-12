@@ -123,6 +123,12 @@ class PlexService:
                 if item.get("type") != "movie":
                     continue
 
+                # calculate total size from all media parts
+                total_size = 0
+                for media in item.get("Media", []):
+                    for part in media.get("Part", []):
+                        total_size += part.get("size", 0)
+
                 movie = PlexMovie(
                     id=item["ratingKey"],
                     name=item.get("title", ""),
@@ -141,6 +147,7 @@ class PlexService:
                     else None,
                     view_count=item.get("viewCount", 0),
                     external_ids=self._parse_external_ids(item),
+                    size=total_size,
                 )
                 all_movies.append(movie)
 
@@ -181,6 +188,22 @@ class PlexService:
                 if item.get("type") != "show":
                     continue
 
+                # calculate total size by fetching all episodes and summing their sizes
+                total_size = 0
+                show_rating_key = item["ratingKey"]
+                # fetch all episodes for this show using the allLeaves endpoint
+                episodes_data = await self._make_request(
+                    f"library/metadata/{show_rating_key}/allLeaves"
+                )
+                if episodes_data:
+                    episodes = episodes_data.get("MediaContainer", {}).get(  # pyright: ignore [reportAttributeAccessIssue]
+                        "Metadata", []
+                    )
+                    for episode in episodes:
+                        for media in episode.get("Media", []):
+                            for part in media.get("Part", []):
+                                total_size += part.get("size", 0)
+
                 series = PlexSeries(
                     id=item["ratingKey"],
                     name=item.get("title", ""),
@@ -199,6 +222,7 @@ class PlexService:
                     else None,
                     view_count=item.get("viewCount", 0),
                     external_ids=self._parse_external_ids(item),
+                    size=total_size,
                 )
                 all_series.append(series)
 
@@ -220,6 +244,7 @@ class PlexService:
                 added_at=m.added_at,
                 premiere_date=None,  # plex doesn't provide premiere date directly
                 external_ids=m.external_ids,
+                size=m.size,
                 view_count=m.view_count,
                 last_viewed_at=m.last_viewed_at,
                 never_watched=(m.view_count == 0),
@@ -244,6 +269,7 @@ class PlexService:
                 added_at=s.added_at,
                 premiere_date=None,  # plex doesn't provide premiere date directly
                 external_ids=s.external_ids,
+                size=s.size,
                 view_count=s.view_count,
                 last_viewed_at=s.last_viewed_at,
                 never_watched=(s.view_count == 0),

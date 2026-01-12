@@ -19,6 +19,7 @@ class PlexMovie:
     last_viewed_at: datetime | None
     view_count: int
     external_ids: ExternalIDs | None
+    size: int
 
 
 @dataclass(slots=True, frozen=True)
@@ -34,3 +35,4 @@ class PlexSeries:
     last_viewed_at: datetime | None
     view_count: int
     external_ids: ExternalIDs | None
+    size: int

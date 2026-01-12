@@ -117,7 +117,7 @@ class JellyfinService:
             "includeItemTypes": "Movie",
             "recursive": "true",
             "enableTotalRecordCount": "true",
-            "Fields": "ProviderIds",
+            "Fields": "ProviderIds,MediaSources",
             "ParentId": library_id,
         }
 
@@ -162,6 +162,8 @@ class JellyfinService:
                 library_id=library_id,
                 library_name=library_name,
                 external_ids=external_ids,
+                # we're just getting index 0 because there should only be one file
+                size=item["MediaSources"][0]["Size"],
                 user_data=user_data,
             )
             data.append(movie)
@@ -187,7 +189,7 @@ class JellyfinService:
             "includeItemTypes": "Series",
             "recursive": "true",
             "enableTotalRecordCount": "true",
-            "Fields": "ProviderIds",
+            "Fields": "ProviderIds,MediaSources",
             "ParentId": library_id,
         }
 
@@ -231,6 +233,7 @@ class JellyfinService:
                 library_id=library_id,
                 library_name=library_name,
                 external_ids=external_ids,
+                size=sum(src["Size"] for src in item["MediaSources"]),
                 user_data=user_data,
             )
             data.append(series)
@@ -317,6 +320,7 @@ class JellyfinService:
                             "premiere_date": movie.premiere_date,
                             "container": movie.container,
                             "external_ids": movie.external_ids,
+                            "size": movie.size,
                             "view_count": movie.user_data.play_count
                             if movie.user_data
                             else 0,
@@ -403,6 +407,7 @@ class JellyfinService:
                             "added_at": series.date_created,
                             "premiere_date": series.premiere_date,
                             "external_ids": series.external_ids,
+                            "size": series.size,
                             "view_count": series.user_data.play_count
                             if series.user_data
                             else 0,
