@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from backend.core.logger import LOG
+from backend.enums import Service
 from backend.services.jellyfin import JellyfinService
 from backend.services.plex import PlexService
 from backend.services.radarr import RadarrClient
@@ -49,6 +50,33 @@ class ServiceManager:
     def seerr(self) -> SeerrClient | None:
         """Get Seerr service (must be initialized first)."""
         return self._seerr
+
+    async def get_status(self) -> dict[str, bool]:
+        """Get connection status of all clients."""
+        return {
+            "jellyfin": self._jellyfin is not None,
+            "plex": self._plex is not None,
+            "radarr": self._radarr is not None,
+            "sonarr": self._sonarr is not None,
+            "seerr": self._seerr is not None,
+        }
+
+    async def return_service(
+        self, service_type: Service
+    ) -> (
+        JellyfinService | PlexService | RadarrClient | SonarrClient | SeerrClient | None
+    ):
+        """Return the requested service instance."""
+        if service_type is Service.JELLYFIN:
+            return self._jellyfin
+        elif service_type is Service.PLEX:
+            return self._plex
+        elif service_type is Service.RADARR:
+            return self._radarr
+        elif service_type is Service.SONARR:
+            return self._sonarr
+        elif service_type is Service.SEERR:
+            return self._seerr
 
     async def initialize_jellyfin(
         self, base_url: str, api_key: str
@@ -180,16 +208,6 @@ class ServiceManager:
         await self.clear_sonarr()
         await self.clear_seerr()
 
-    def get_status(self) -> dict[str, bool]:
-        """Get connection status of all clients."""
-        return {
-            "jellyfin": self._jellyfin is not None,
-            "plex": self._plex is not None,
-            "radarr": self._radarr is not None,
-            "sonarr": self._sonarr is not None,
-            "seerr": self._seerr is not None,
-        }
-
 
 # global manager instance
-client_manager = ServiceManager()
+service_manager = ServiceManager()
