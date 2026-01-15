@@ -61,35 +61,49 @@ class Logger:
         # log initial program info on first initialization
         self.info(f"{program_name} v{__version__}")
 
-    def debug(self, message: str, source: LogSource | None = None) -> None:
+    def debug(
+        self, message: str, source: LogSource | None = None, exc_info: bool = False
+    ) -> None:
         if self.logger.level <= logging.DEBUG:
             self._initialize_file_handler()
             src = source or self.default_source
-            self.logger.debug(f"{src.value}: {str(message).strip()}")
+            self.logger.debug(f"{src.value}: {str(message).strip()}", exc_info=exc_info)
 
-    def info(self, message: str, source: LogSource | None = None) -> None:
+    def info(
+        self, message: str, source: LogSource | None = None, exc_info: bool = False
+    ) -> None:
         if self.logger.level <= logging.INFO:
             self._initialize_file_handler()
             src = source or self.default_source
-            self.logger.info(f"{src.value}: {str(message).strip()}")
+            self.logger.info(f"{src.value}: {str(message).strip()}", exc_info=exc_info)
 
-    def warning(self, message: str, source: LogSource | None = None) -> None:
+    def warning(
+        self, message: str, source: LogSource | None = None, exc_info: bool = False
+    ) -> None:
         if self.logger.level <= logging.WARNING:
             self._initialize_file_handler()
             src = source or self.default_source
-            self.logger.warning(f"{src.value}: {str(message).strip()}")
+            self.logger.warning(
+                f"{src.value}: {str(message).strip()}", exc_info=exc_info
+            )
 
-    def error(self, message: str, source: LogSource | None = None) -> None:
+    def error(
+        self, message: str, source: LogSource | None = None, exc_info: bool = False
+    ) -> None:
         if self.logger.level <= logging.ERROR:
             self._initialize_file_handler()
             src = source or self.default_source
-            self.logger.error(f"{src.value}: {str(message).strip()}")
+            self.logger.error(f"{src.value}: {str(message).strip()}", exc_info=exc_info)
 
-    def critical(self, message: str, source: LogSource | None = None) -> None:
+    def critical(
+        self, message: str, source: LogSource | None = None, exc_info: bool = False
+    ) -> None:
         if self.logger.level <= logging.CRITICAL:
             self._initialize_file_handler()
             src = source or self.default_source
-            self.logger.critical(f"{src.value}: {str(message).strip()}")
+            self.logger.critical(
+                f"{src.value}: {str(message).strip()}", exc_info=exc_info
+            )
 
     def exception(self, message: str, source: LogSource | None = None) -> None:
         """Log exception with traceback (use within except block)"""
