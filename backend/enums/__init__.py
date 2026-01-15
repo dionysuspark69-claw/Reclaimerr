@@ -14,11 +14,6 @@ class MediaType(StrEnum):
     SERIES = auto()
 
 
-class SeriesStatus(StrEnum):
-    CONTINUING = auto()
-    ENDED = auto()
-
-
 class TaskStatus(StrEnum):
     PENDING = auto()
     RUNNING = auto()
