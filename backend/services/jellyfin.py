@@ -6,6 +6,7 @@ from typing import Any
 
 import niquests
 
+from backend.core.logger import LOG
 from backend.enums import Service
 from backend.models.clients.jellyfin import (
     JellyfinMovie,
@@ -130,6 +131,10 @@ class JellyfinService:
 
         data = []
         for item in items_data:
+            provider_ids = item.get("ProviderIds", {})
+            tmdb_id = provider_ids.get("Tmdb")
+            if not tmdb_id:
+                continue  # skip items without TMDB ID (will be logged after aggregation)
             user_data = JellyfinUserData(
                 id=item["UserData"]["ItemId"],
                 key=item["UserData"]["Key"],
@@ -141,10 +146,9 @@ class JellyfinService:
                 else None,
                 played=item["UserData"]["Played"],
             )
-            provider_ids = item.get("ProviderIds", {})
             external_ids = ExternalIDs(
                 imdb=provider_ids.get("Imdb"),
-                tmdb=int(provider_ids.get("Tmdb")),
+                tmdb=int(tmdb_id),
                 tmdb_collection=provider_ids.get("TmdbCollection"),
                 tvdb=provider_ids.get("Tvdb"),
             )
@@ -207,6 +211,10 @@ class JellyfinService:
 
         data = []
         for item in items_data:
+            provider_ids = item.get("ProviderIds", {})
+            tmdb_id = provider_ids.get("Tmdb")
+            if not tmdb_id:
+                continue  # skip items without TMDB ID
             user_data = JellyfinUserData(
                 id=item["UserData"]["ItemId"],
                 key=item["UserData"]["Key"],
@@ -221,7 +229,7 @@ class JellyfinService:
             provider_ids = item.get("ProviderIds", {})
             external_ids = ExternalIDs(
                 imdb=provider_ids.get("Imdb"),
-                tmdb=int(provider_ids.get("Tmdb")),
+                tmdb=int(tmdb_id),
                 tmdb_collection=provider_ids.get("TmdbCollection"),
                 tvdb=provider_ids.get("Tvdb"),
             )
@@ -368,6 +376,7 @@ class JellyfinService:
         for library in libraries_to_query:
             library_id = library["id"]
             library_name = library["name"]
+            LOG.debug(f"Processing movie library: {library_name} (ID: {library_id})")
 
             for user in await self.get_users():
                 user_movies = await self.get_movies_for_user(
@@ -448,6 +457,7 @@ class JellyfinService:
         for library in libraries_to_query:
             library_id = library["id"]
             library_name = library["name"]
+            LOG.debug(f"Processing series library: {library_name} (ID: {library_id})")
 
             # get first user to fetch series sizes (sizes are same for all users)
             users = await self.get_users()
