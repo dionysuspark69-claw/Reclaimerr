@@ -5,6 +5,7 @@ from datetime import datetime
 
 import niquests
 
+from backend.core.logger import LOG
 from backend.enums import Service
 from backend.models.clients.plex import PlexMovie, PlexSeries
 from backend.models.media import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
@@ -145,6 +146,8 @@ class PlexService:
         for section in movie_sections:
             section_id = section["key"]
             section_name = section.get("title", "Unknown")
+            LOG.debug(f"Processing movie library: {section_name} (ID: {section_id})")
+
             # type=1 to only fetch movies, not collections
             # includeGuids=1 to get external IDs
             items_data = await self._make_request(
@@ -214,6 +217,7 @@ class PlexService:
         for section in show_sections:
             section_id = section["key"]
             section_name = section.get("title", "Unknown")
+            LOG.debug(f"Processing series library: {section_name} (ID: {section_id})")
 
             # fetch all episode sizes for this section in one API call
             series_sizes = await self.get_series_sizes_for_section(section_id)
