@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime
 
 import niquests
@@ -60,6 +61,81 @@ class PlexService:
             await self._make_request("")
             return True
         except Exception:
+            return False
+
+    async def delete_item(self, rating_key: str) -> None:
+        """Delete an item (movie or series) from Plex.
+
+        Args:
+            rating_key: Plex rating key (item ID)
+        """
+        try:
+            response = await self.session.delete(
+                f"{self.plex_url}/library/metadata/{rating_key}"
+            )
+            response.raise_for_status()
+            LOG.debug(f"Deleted Plex item {rating_key}")
+        except Exception as e:
+            raise ValueError(f"Failed to delete Plex item {rating_key}: {e}")
+
+    async def scan_item_path(self, item_path: str) -> bool:
+        """Scan a specific item path in Plex library.
+
+        This triggers Plex to scan the specific path, similar to how Radarr/Sonarr
+        notify Plex to update specific movie/series paths after deletion.
+
+        Args:
+            item_path: Filesystem path to the item (e.g., '/movies/The Matrix (1999)')
+
+        Returns:
+            True if scan was triggered successfully, False otherwise
+        """
+        try:
+            # plex's scan endpoint with path parameter scans the specific path
+            # we need to find the section that contains this path first
+            sections = await self.get_library_sections()
+
+            # try to find which section this path belongs to by checking location paths
+            for section in sections:
+                section_id = section.get("key")
+                if not section_id:
+                    continue
+
+                # get section details to check locations
+                section_details = await self._make_request(
+                    f"library/sections/{section_id}"
+                )
+                directories = section_details.get("MediaContainer", {}).get(  # pyright: ignore [reportAttributeAccessIssue]
+                    "Directory", []
+                )
+                if not directories:
+                    continue
+
+                locations = (
+                    directories[0].get("Location", [])
+                    if isinstance(directories, list) and directories
+                    else []
+                )
+
+                # check if item_path is within any of this section's locations
+                for location in locations:
+                    location_path = location.get("path", "")
+                    if item_path.startswith(location_path):
+                        # found the right section, trigger scan with specific path
+                        response = await self.session.get(
+                            f"{self.plex_url}/library/sections/{section_id}/refresh",
+                            params={"path": item_path},
+                        )
+                        response.raise_for_status()
+                        LOG.debug(
+                            f"Triggered Plex scan for path: {item_path} in section {section_id}"
+                        )
+                        return True
+
+            LOG.warning(f"Could not find Plex section for path: {item_path}")
+            return False
+        except Exception as e:
+            LOG.error(f"Failed to scan Plex path {item_path}: {e}")
             return False
 
     async def _get_media_libraries(self, media_type: str) -> list[dict[str, str]]:
@@ -126,6 +202,45 @@ class PlexService:
 
         return series_sizes
 
+    async def get_series_paths_for_section(self, section_id: str) -> dict[str, str]:
+        """Get paths for all series in a library section by extracting from first episode.
+
+        Args:
+            section_id: The Plex library section ID
+
+        Returns:
+            Dictionary mapping series rating key to series directory path
+        """
+        # type=4 fetches all episodes in the section
+        episodes_data = await self._make_request(
+            f"library/sections/{section_id}/all",
+            params={"type": 4},
+        )
+        if not episodes_data:
+            return {}
+
+        episodes = episodes_data.get("MediaContainer", {}).get("Metadata", [])  # pyright: ignore [reportAttributeAccessIssue]
+
+        # extract series paths from first episode of each series
+        series_paths: dict[str, str] = {}
+        for episode in episodes:
+            series_key = episode.get("grandparentRatingKey")
+            if not series_key or series_key in series_paths:
+                continue
+
+            # get file path from first episode
+            media_list = episode.get("Media", [])
+            if media_list and media_list[0].get("Part"):
+                episode_file = media_list[0]["Part"][0].get("file")
+                if episode_file:
+                    # extract series directory (parent of Season folder)
+                    # e.g., "/media/tv/Series Name/Season 01/episode.mkv" -> "/media/tv/Series Name"
+                    # go up two levels: episode file -> season dir -> series dir
+                    series_path = os.path.dirname(os.path.dirname(episode_file))
+                    series_paths[series_key] = series_path
+
+        return series_paths
+
     async def get_movies(
         self, included_libraries: list[str] | None = None
     ) -> list[PlexMovie]:
@@ -178,6 +293,9 @@ class PlexService:
                     name=item.get("title", ""),
                     year=item.get("year"),
                     library_name=section_name,
+                    path=item.get("Media", [{}])[0].get("Part", [{}])[0].get("file")
+                    if item.get("Media")
+                    else None,
                     added_at=datetime.fromtimestamp(item["addedAt"]).astimezone()
                     if item.get("addedAt")
                     else None,
@@ -219,8 +337,9 @@ class PlexService:
             section_name = section.get("title", "Unknown")
             LOG.debug(f"Processing series library: {section_name} (ID: {section_id})")
 
-            # fetch all episode sizes for this section in one API call
+            # fetch all episode sizes and paths for this section in one API call
             series_sizes = await self.get_series_sizes_for_section(section_id)
+            series_paths = await self.get_series_paths_for_section(section_id)
 
             # type=2 to only fetch shows, not collections
             # includeGuids=1 to get external IDs
@@ -237,8 +356,10 @@ class PlexService:
                 if item.get("type") != "show":
                     continue
 
-                # get size from pre-calculated series sizes
-                total_size = series_sizes.get(str(item["ratingKey"]), 0)
+                rating_key = str(item["ratingKey"])
+                # get size and path from pre-calculated data
+                total_size = series_sizes.get(rating_key, 0)
+                series_path = series_paths.get(rating_key)
 
                 ext_ids = self._parse_external_ids(item)
                 if not ext_ids:
@@ -249,6 +370,7 @@ class PlexService:
                     name=item.get("title", ""),
                     year=item.get("year"),
                     library_name=section_name,
+                    path=series_path,
                     added_at=datetime.fromtimestamp(item["addedAt"]).astimezone()
                     if item.get("addedAt")
                     else None,
@@ -281,6 +403,7 @@ class PlexService:
                 year=m.year,
                 service=Service.PLEX,
                 library_name=m.library_name,
+                path=m.path,
                 added_at=m.added_at,
                 premiere_date=None,  # plex doesn't provide premiere date directly
                 external_ids=m.external_ids,
@@ -305,7 +428,9 @@ class PlexService:
                 id=s.id,
                 name=s.name,
                 year=s.year,
+                service=Service.PLEX,
                 library_name=s.library_name,
+                path=s.path,
                 added_at=s.added_at,
                 premiere_date=None,  # plex doesn't provide premiere date directly
                 external_ids=s.external_ids,
