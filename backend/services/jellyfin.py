@@ -71,6 +71,44 @@ class JellyfinService:
         except Exception:
             return False
 
+    async def delete_item(self, item_id: str) -> None:
+        """Delete an item (movie or series) from Jellyfin.
+
+        Args:
+            item_id: Jellyfin item ID
+        """
+        try:
+            response = await self.session.delete(f"{self.jellyfin_url}/Items/{item_id}")
+            response.raise_for_status()
+            LOG.debug(f"Deleted Jellyfin item {item_id}")
+        except Exception as e:
+            raise ValueError(f"Failed to delete Jellyfin item {item_id}: {e}")
+
+    async def refresh_item_path(self, item_path: str) -> bool:
+        """Refresh a specific item by its filesystem path in Jellyfin.
+
+        This triggers Jellyfin to scan the specific path, similar to how Radarr/Sonarr
+        notify Jellyfin to update specific movie/series paths after deletion.
+
+        Args:
+            item_path: Filesystem path to the item (e.g., '/movies/The Matrix (1999)')
+
+        Returns:
+            True if refresh was triggered successfully, False otherwise
+        """
+        try:
+            # jellyfin's Library/Media/Updated endpoint accepts path-specific updates
+            response = await self.session.post(
+                f"{self.jellyfin_url}/Library/Media/Updated",
+                json={"Updates": [{"Path": item_path, "UpdateType": "Deleted"}]},
+            )
+            response.raise_for_status()
+            LOG.debug(f"Triggered Jellyfin refresh for path: {item_path}")
+            return True
+        except Exception as e:
+            LOG.error(f"Failed to refresh Jellyfin path {item_path}: {e}")
+            return False
+
     async def _get_media_libraries(self, media_type: str) -> list[dict[str, str]]:
         """Get list of media libraries of a specific type with their IDs and names."""
         virtual_folders = await self._make_request("Library/VirtualFolders")  # pyright: ignore [reportAttributeAccessIssue]
@@ -118,7 +156,7 @@ class JellyfinService:
             "includeItemTypes": "Movie",
             "recursive": "true",
             "enableTotalRecordCount": "true",
-            "Fields": "ProviderIds,MediaSources,DateCreated",
+            "Fields": "ProviderIds,MediaSources,DateCreated,Path",
             "ParentId": library_id,
         }
 
@@ -166,6 +204,7 @@ class JellyfinService:
                 container=item.get("Container"),
                 library_id=library_id,
                 library_name=library_name,
+                path=item.get("Path"),
                 external_ids=external_ids,
                 # we're just getting index 0 because there should only be one file
                 size=item["MediaSources"][0]["Size"] if has_file else 0,
@@ -198,7 +237,7 @@ class JellyfinService:
             "includeItemTypes": "Series",
             "recursive": "true",
             "enableTotalRecordCount": "true",
-            "Fields": "ProviderIds",
+            "Fields": "ProviderIds,Path",
             "ParentId": library_id,
         }
 
@@ -249,6 +288,7 @@ class JellyfinService:
                 date_created=series_date,
                 library_id=library_id,
                 library_name=library_name,
+                path=item.get("Path"),
                 external_ids=external_ids,
                 size=total_size,
                 user_data=user_data,
@@ -270,47 +310,66 @@ class JellyfinService:
             - series_sizes: Dictionary mapping series_id to total size in bytes
             - series_dates: Dictionary mapping series_id to oldest episode DateCreated
         """
-        params = {
-            "userId": user_id,
-            "includeItemTypes": "Episode",
-            "recursive": "true",
-            "Fields": "MediaSources,SeriesId,DateCreated",
-            "ParentId": library_id,
-        }
-
-        get_data = await self._make_request("Items", params=params)
-        if not get_data:
-            return {}, {}
-
-        episodes = get_data.get("Items", [])  # pyright: ignore [reportAttributeAccessIssue]
-
         # group episodes by series and sum sizes, track oldest date
         series_sizes: dict[str, int] = {}
         series_dates: dict[str, datetime] = {}
 
-        for episode in episodes:
-            series_id = episode.get("SeriesId")
-            if not series_id:
-                continue
+        # fetch episodes in paginated batches to avoid timeout on large libraries
+        start_index = 0
+        limit = 500  # process 500 episodes at a time
 
-            # sum sizes
-            episode_size = 0
-            media_sources = episode.get("MediaSources", [])
-            for source in media_sources:
-                episode_size += source.get("Size", 0)
+        while True:
+            params = {
+                "userId": user_id,
+                "includeItemTypes": "Episode",
+                "recursive": "true",
+                "Fields": "MediaSources,SeriesId,DateCreated",
+                "ParentId": library_id,
+                "StartIndex": str(start_index),
+                "Limit": str(limit),
+            }
 
-            if series_id not in series_sizes:
-                series_sizes[series_id] = 0
-            series_sizes[series_id] += episode_size
+            get_data = await self._make_request("Items", params=params)
+            if not get_data:
+                break
 
-            # track oldest DateCreated (first episode added)
-            if episode.get("DateCreated"):
-                episode_date = datetime.fromisoformat(episode["DateCreated"])
-                if (
-                    series_id not in series_dates
-                    or episode_date < series_dates[series_id]
-                ):
-                    series_dates[series_id] = episode_date
+            episodes = get_data.get("Items", [])  # pyright: ignore [reportAttributeAccessIssue]
+            if not episodes:
+                break
+
+            LOG.debug(
+                f"Processing episodes {start_index} to {start_index + len(episodes)}"
+            )
+
+            for episode in episodes:
+                series_id = episode.get("SeriesId")
+                if not series_id:
+                    continue
+
+                # sum sizes
+                episode_size = 0
+                media_sources = episode.get("MediaSources", [])
+                for source in media_sources:
+                    episode_size += source.get("Size", 0)
+
+                if series_id not in series_sizes:
+                    series_sizes[series_id] = 0
+                series_sizes[series_id] += episode_size
+
+                # track oldest DateCreated (first episode added)
+                if episode.get("DateCreated"):
+                    episode_date = datetime.fromisoformat(episode["DateCreated"])
+                    if (
+                        series_id not in series_dates
+                        or episode_date < series_dates[series_id]
+                    ):
+                        series_dates[series_id] = episode_date
+
+            # check if we've fetched all episodes
+            total_record_count = get_data.get("TotalRecordCount", 0)  # pyright: ignore [reportAttributeAccessIssue]
+            start_index += len(episodes)
+            if start_index >= total_record_count:
+                break
 
         return series_sizes, series_dates
 
@@ -324,33 +383,49 @@ class JellyfinService:
         series_watch_dates: dict[str, datetime] = {}
 
         try:
-            params = {
-                "userId": user_id,
-                "includeItemTypes": "Episode",
-                "recursive": "true",
-                "Filters": "IsPlayed",
-                "Fields": "SeriesId",
-                "SortBy": "DatePlayed",
-                "SortOrder": "Descending",
-            }
-            get_data = await self._make_request("Items", params=params)
-            if not get_data:
-                raise Exception("No data returned")
-            items_data = get_data.get("Items", [])  # pyright: ignore [reportAttributeAccessIssue]
+            # fetch in paginated batches to avoid timeout on large libraries
+            start_index = 0
+            limit = 500
 
-            # group by series and keep the most recent watch date
-            for item in items_data:
-                series_id = item.get("SeriesId")
-                last_played = item.get("UserData", {}).get("LastPlayedDate")
+            while True:
+                params = {
+                    "userId": user_id,
+                    "includeItemTypes": "Episode",
+                    "recursive": "true",
+                    "Filters": "IsPlayed",
+                    "Fields": "SeriesId",
+                    "SortBy": "DatePlayed",
+                    "SortOrder": "Descending",
+                    "StartIndex": str(start_index),
+                    "Limit": str(limit),
+                }
+                get_data = await self._make_request("Items", params=params)
+                if not get_data:
+                    break
 
-                if series_id and last_played:
-                    watch_date = datetime.fromisoformat(last_played)
+                items_data = get_data.get("Items", [])  # pyright: ignore [reportAttributeAccessIssue]
+                if not items_data:
+                    break
 
-                    # keep the most recent date (items are already sorted by DatePlayed descending)
-                    if series_id not in series_watch_dates:
-                        series_watch_dates[series_id] = watch_date
-                    elif watch_date > series_watch_dates[series_id]:
-                        series_watch_dates[series_id] = watch_date
+                # group by series and keep the most recent watch date
+                for item in items_data:
+                    series_id = item.get("SeriesId")
+                    last_played = item.get("UserData", {}).get("LastPlayedDate")
+
+                    if series_id and last_played:
+                        watch_date = datetime.fromisoformat(last_played)
+
+                        # keep the most recent date (items are already sorted by DatePlayed descending)
+                        if series_id not in series_watch_dates:
+                            series_watch_dates[series_id] = watch_date
+                        elif watch_date > series_watch_dates[series_id]:
+                            series_watch_dates[series_id] = watch_date
+
+                # check if we've fetched all episodes
+                total_record_count = get_data.get("TotalRecordCount", 0)  # pyright: ignore [reportAttributeAccessIssue]
+                start_index += len(items_data)
+                if start_index >= total_record_count:
+                    break
 
             return series_watch_dates
         except Exception:
@@ -391,6 +466,7 @@ class JellyfinService:
                             "name": movie.name,
                             "year": movie.year,
                             "library_name": movie.library_name,
+                            "path": movie.path,
                             "service": Service.JELLYFIN,
                             "added_at": movie.date_created,
                             "premiere_date": movie.premiere_date,
@@ -494,7 +570,9 @@ class JellyfinService:
                             "id": series.id,
                             "name": series.name,
                             "year": series.year,
+                            "service": Service.JELLYFIN,
                             "library_name": series.library_name,
+                            "path": series.path,
                             "added_at": series.date_created,
                             "premiere_date": series.premiere_date,
                             "external_ids": series.external_ids,
