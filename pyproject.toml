@@ -1,0 +1,47 @@
+[project]
+name = "vacuumarr"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "alembic>=1.17.2",
+    "apscheduler>=3.11.2",
+    "argon2-cffi>=23.1.0",
+    "fastapi[standard]>=0.128.0",
+    "niquests[speedups]>=3.16.1",
+    "pydantic-settings>=2.12.0",
+    "pyjwt>=2.10.1",
+    "python-dotenv>=1.2.1",
+    "semver>=3.0.4",
+    "shortuuid>=1.0.13",
+    "sqlalchemy[asyncio]>=2.0.45",
+    "uvicorn>=0.40.0",
+]
+
+[project.optional-dependencies]
+dev = ["ruff"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend/core", "backend/api", "backend/services"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+include = [
+    "backend/core/**/*.py",
+    "backend/api/**/*.py",
+    "backend/services/**/*.py",
+]
+
+[tool.ruff.lint]
+select = ["I", "UP"]
+
+[tool.basedpyright]
+include = ["backend"]
+typeCheckingMode = "standard"
