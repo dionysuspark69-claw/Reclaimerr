@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.logger import LOG
 from backend.core.service_manager import service_manager
 from backend.core.settings import settings
-from backend.database.database import async_db, get_db
+from backend.database import async_db, get_db
 from backend.database.models import CleanupCandidate, CleanupRule, Movie, Series
 from backend.enums import MediaType
 
@@ -193,6 +193,8 @@ def _evaluate_rule(
             rule.include_never_watched is not None,
             rule.min_days_since_added is not None,
             rule.max_days_since_added is not None,
+            rule.min_days_since_last_watched is not None,
+            rule.max_days_since_last_watched is not None,
             rule.min_size is not None,
             rule.max_size is not None,
         )
@@ -304,6 +306,35 @@ def _evaluate_rule(
         ):
             matched_criteria["days_since_added"] = days_since_added
             rule_reasons.append(f"Added {days_since_added} days ago")
+
+    # check days since last watched
+    if item.last_viewed_at:
+        days_since_last_watched = (
+            datetime.now(timezone.utc)
+            - item.last_viewed_at.replace(tzinfo=timezone.utc)
+        ).days
+        if (
+            rule.min_days_since_last_watched is not None
+            and days_since_last_watched < rule.min_days_since_last_watched
+        ):
+            return False
+        if (
+            rule.max_days_since_last_watched is not None
+            and days_since_last_watched > rule.max_days_since_last_watched
+        ):
+            return False
+        if (
+            rule.min_days_since_last_watched is not None
+            or rule.max_days_since_last_watched is not None
+        ):
+            matched_criteria["days_since_last_watched"] = days_since_last_watched
+            rule_reasons.append(f"Last watched {days_since_last_watched} days ago")
+    elif (
+        rule.min_days_since_last_watched is not None
+        or rule.max_days_since_last_watched is not None
+    ):
+        # if filtering by days since last watched but item was never watched, exclude it
+        return False
 
     # check size (bytes)
     if rule.min_size is not None and (item.size is None or item.size < rule.min_size):
