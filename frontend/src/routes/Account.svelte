@@ -5,16 +5,7 @@
   import Spinner from "$lib/components/ui/spinner.svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import { toast } from "svelte-sonner";
-
-  interface UserProfile {
-    id: number;
-    username: string;
-    display_name: string | null;
-    email: string | null;
-    role: string;
-    avatar_url: string | null;
-    created_at: string;
-  }
+  import type { UserProfile } from "$lib/types/shared";
 
   let loading = false;
   let profile: UserProfile | null = null;
