@@ -1,0 +1,419 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { get_api, post_api } from "$lib/api";
+  import ErrorBox from "$lib/components/ErrorBox.svelte";
+  import Spinner from "$lib/components/ui/spinner.svelte";
+  import { Button } from "$lib/components/ui/button/index.js";
+  import { toast } from "svelte-sonner";
+
+  interface UserProfile {
+    id: number;
+    username: string;
+    display_name: string | null;
+    email: string | null;
+    role: string;
+    avatar_url: string | null;
+    created_at: string;
+  }
+
+  let loading = false;
+  let profile: UserProfile | null = null;
+  let avatarUpdating = false;
+  let profileUpdating = false;
+  let passwordUpdating = false;
+  let profileError = "";
+
+  // profile form
+  let profileForm = {
+    display_name: "",
+    email: "",
+  };
+
+  // password form
+  let passwordForm = {
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
+  };
+
+  // avatar upload
+  let avatarFile: File | null = null;
+  let avatarPreview: string | null = null;
+
+  // load user profile
+  async function loadProfile() {
+    try {
+      loading = true;
+      profileError = "";
+      profile = await get_api<UserProfile>("/api/auth/me");
+      profileForm.display_name = profile.display_name || "";
+      profileForm.email = profile.email || "";
+      avatarPreview = profile.avatar_url;
+    } catch (err: any) {
+      profileError = err.message;
+    } finally {
+      loading = false;
+    }
+  }
+
+  // update profile information
+  async function updateProfileInfo() {
+    try {
+      profileUpdating = true;
+      const response: {
+        message: string;
+        email: string | null;
+        display_name: string | null;
+      } = await post_api("/api/auth/me", profileForm);
+      profileForm = {
+        display_name: response.display_name || "",
+        email: response.email || "",
+      };
+      toast.success(response.message);
+    } catch (err: any) {
+      toast.error(`Error updating profile: ${err.message}`);
+    } finally {
+      profileUpdating = false;
+    }
+  }
+
+  // update password
+  async function updatePassword() {
+    try {
+      passwordUpdating = true;
+
+      if (
+        passwordForm.new_password.trim() !==
+        passwordForm.confirm_password.trim()
+      ) {
+        toast.warning("New passwords do not match");
+        return;
+      }
+
+      if (passwordForm.new_password.trim().length < 8) {
+        toast.warning("Password must be at least 8 characters");
+        return;
+      }
+
+      const response: {
+        message: string;
+      } = await post_api("/api/auth/change-password", {
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password,
+      });
+
+      // reset form
+      passwordForm = {
+        current_password: "",
+        new_password: "",
+        confirm_password: "",
+      };
+
+      toast.success(response.message);
+    } catch (err: any) {
+      toast.error(`Error changing password: ${err.message}`);
+    } finally {
+      passwordUpdating = false;
+    }
+  }
+
+  // handle avatar selection
+  function handleAvatarSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      avatarFile = input.files[0];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        avatarPreview = e.target?.result as string;
+      };
+      reader.readAsDataURL(avatarFile);
+    }
+  }
+
+  // upload avatar
+  async function uploadAvatar() {
+    if (!avatarFile) return;
+    avatarUpdating = true;
+    try {
+      profileError = "";
+      const formData = new FormData();
+      formData.append("avatar", avatarFile);
+      await post_api("/api/auth/avatar", formData);
+      avatarFile = null;
+    } catch (err: any) {
+      profileError = err.message;
+    } finally {
+      avatarUpdating = false;
+    }
+  }
+
+  // load profile on mount
+  onMount(() => {
+    loadProfile();
+  });
+</script>
+
+<div class="p-8">
+  <div class="max-w-5xl mx-auto">
+    <!-- header -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-foreground mb-2">Account Settings</h1>
+      <p class="text-muted-foreground">Manage your profile and preferences</p>
+    </div>
+
+    <ErrorBox error={profileError} />
+
+    {#if loading}
+      <div class="p-8 text-center text-muted-foreground">
+        <Spinner size="lg" class="text-primary" />
+        <p class="mt-4">Loading profile...</p>
+      </div>
+    {:else if profile}
+      <div class="space-y-6">
+        <!-- avatar Section -->
+        <div class="bg-card rounded-lg border border-border p-6">
+          <h2 class="text-xl font-semibold text-foreground mb-4">
+            Profile Picture
+          </h2>
+          <div class="flex items-center gap-6">
+            <div class="relative">
+              {#if avatarPreview}
+                <img
+                  src={avatarPreview}
+                  alt="Avatar"
+                  class="w-32 h-32 rounded-full object-cover border-4 border-primary"
+                />
+              {:else}
+                <div
+                  class="w-32 h-32 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-4xl font-bold border-4 border-primary"
+                >
+                  {profile.username.charAt(0).toUpperCase()}
+                </div>
+              {/if}
+            </div>
+            <div class="flex-1">
+              <input
+                type="file"
+                accept="image/*"
+                on:change={handleAvatarSelect}
+                class="hidden"
+                id="avatar-upload"
+                disabled={avatarUpdating}
+              />
+              <label
+                for="avatar-upload"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-secondary/80 text-foreground font-medium rounded-lg transition-colors"
+                class:cursor-pointer={!avatarUpdating}
+                class:cursor-not-allowed={avatarUpdating}
+                class:opacity-50={avatarUpdating}
+              >
+                {#if avatarUpdating}
+                  <Spinner size="sm" class="text-primary-foreground" />
+                  <span>Saving...</span>
+                {:else}
+                  Choose Image
+                {/if}
+              </label>
+              {#if avatarFile && !avatarUpdating}
+                <button
+                  on:click={uploadAvatar}
+                  class="ml-3 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors cursor-pointer"
+                >
+                  Upload Avatar
+                </button>
+              {/if}
+            </div>
+          </div>
+        </div>
+
+        <!-- profile information -->
+        <div class="bg-card rounded-lg border border-border p-6">
+          <h2 class="text-xl font-semibold text-foreground mb-4">
+            Profile Information
+          </h2>
+          <form
+            on:submit|preventDefault={updateProfileInfo}
+            class="space-y-4"
+            autocomplete="off"
+          >
+            <div>
+              <label
+                for="username"
+                class="block text-sm font-medium text-foreground mb-2"
+              >
+                Username
+              </label>
+              <input
+                type="text"
+                value={profile.username}
+                disabled
+                class="w-full px-4 py-2 bg-muted border border-border rounded-lg text-muted-foreground cursor-not-allowed"
+                id="username"
+              />
+              <p class="mt-1 text-xs text-muted-foreground">
+                Username cannot be changed
+              </p>
+            </div>
+
+            <div>
+              <label
+                for="display_name"
+                class="block text-sm font-medium text-foreground mb-2"
+              >
+                Display Name
+              </label>
+              <input
+                type="text"
+                bind:value={profileForm.display_name}
+                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                placeholder="Your display name"
+                id="display_name"
+                disabled={profileUpdating}
+              />
+            </div>
+
+            <div>
+              <label
+                for="email"
+                class="block text-sm font-medium text-foreground mb-2"
+              >
+                Email
+              </label>
+              <input
+                type="email"
+                bind:value={profileForm.email}
+                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                placeholder="your.email@example.com"
+                id="email"
+                disabled={profileUpdating}
+              />
+            </div>
+
+            <div
+              class="flex items-center justify-between pt-4 border-t border-border"
+            >
+              <div class="text-sm text-muted-foreground">
+                <span class="font-medium text-foreground">Role:</span>
+                <span class="capitalize">{profile.role}</span>
+              </div>
+              <Button
+                type="submit"
+                class="hover cursor-pointer"
+                disabled={profileUpdating}
+              >
+                {#if profileUpdating}
+                  <Spinner />
+                  Saving...
+                {:else}
+                  Save Changes
+                {/if}
+              </Button>
+            </div>
+          </form>
+        </div>
+
+        <!-- password change -->
+        <div class="bg-card rounded-lg border border-border p-6">
+          <h2 class="text-xl font-semibold text-foreground mb-4">
+            Change Password
+          </h2>
+          <form
+            on:submit|preventDefault={updatePassword}
+            class="space-y-4"
+            autocomplete="off"
+          >
+            <div>
+              <label
+                for="current_password"
+                class="block text-sm font-medium text-foreground mb-2"
+              >
+                Current Password
+              </label>
+              <input
+                type="password"
+                bind:value={passwordForm.current_password}
+                required
+                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                placeholder="Enter current password"
+                id="current_password"
+                disabled={passwordUpdating}
+              />
+            </div>
+
+            <div>
+              <label
+                for="new_password"
+                class="block text-sm font-medium text-foreground mb-2"
+              >
+                New Password
+              </label>
+              <input
+                type="password"
+                bind:value={passwordForm.new_password}
+                required
+                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                placeholder="Enter new password"
+                id="new_password"
+                disabled={passwordUpdating}
+              />
+            </div>
+
+            <div>
+              <label
+                for="confirm_password"
+                class="block text-sm font-medium text-foreground mb-2"
+              >
+                Confirm New Password
+              </label>
+              <input
+                type="password"
+                bind:value={passwordForm.confirm_password}
+                required
+                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                placeholder="Confirm new password"
+                id="confirm_password"
+                disabled={passwordUpdating}
+              />
+            </div>
+
+            <div
+              class="flex items-center pt-4 border-t border-border justify-end"
+            >
+              <Button type="submit" disabled={passwordUpdating}>
+                {#if passwordUpdating}
+                  <Spinner />
+                  Saving...
+                {:else}
+                  Save Changes
+                {/if}
+              </Button>
+            </div>
+          </form>
+        </div>
+
+        <!-- account info -->
+        <div class="bg-card rounded-lg border border-border p-6">
+          <h2 class="text-xl font-semibold text-foreground mb-4">
+            Account Information
+          </h2>
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+              <span class="text-muted-foreground">Account Created:</span>
+              <span class="text-foreground">
+                {new Date(profile.created_at).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-muted-foreground">Role:</span>
+              <span class="text-foreground">{profile.role}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    {/if}
+  </div>
+</div>
