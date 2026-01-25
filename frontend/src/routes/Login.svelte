@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { auth } from "../lib/stores/auth";
-  import logoImage from "../lib/assets/vacuumerr.png";
+  import { auth } from "$lib/stores/auth";
+  import logoImage from "$lib/assets/vacuumerr.png";
 
   let username = "";
   let password = "";
@@ -13,7 +13,7 @@
 
     try {
       await auth.login(username, password);
-      // Successfully logged in, auth store will update and App.svelte will show dashboard
+      // successfully logged in, auth store will update and App.svelte will show dashboard
     } catch (err: any) {
       error = err.message || "Login failed";
     } finally {
@@ -29,16 +29,16 @@
 </script>
 
 <div
-  class="min-h-screen flex items-center justify-center bg-gray-950 bg-gradient-to-t from-gray-700 to-gray-900 px-4"
+  class="min-h-screen flex items-center justify-center bg-gray-950 bg-linear-to-t from-gray-700 to-gray-900 px-4"
 >
   <div class="max-w-md w-full space-y-8">
-    <!-- Logo/Title -->
+    <!-- logo/title -->
     <div class="text-center">
       <img src={logoImage} alt="Vacuumerr" class="w-32 h-32 mx-auto mb-4" />
       <h1 class="text-4xl font-bold text-blue-500 mb-2">Vacuumerr</h1>
     </div>
 
-    <!-- Login Form -->
+    <!-- login form -->
     <div class="bg-gray-900 rounded-lg shadow-xl p-8 border border-gray-800">
       {#if error}
         <div
