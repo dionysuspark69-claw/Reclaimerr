@@ -6,6 +6,7 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { toast } from "svelte-sonner";
   import type { UserProfile } from "$lib/types/shared";
+  import Save from "@lucide/svelte/icons/save";
 
   let loading = false;
   let profile: UserProfile | null = null;
@@ -145,9 +146,9 @@
 </script>
 
 <div class="p-8">
-  <div class="max-w-5xl mx-auto">
+  <div class="max-w-7xl mx-auto">
     <!-- header -->
-    <div class="mb-8">
+    <div class="mb-2">
       <h1 class="text-3xl font-bold text-foreground mb-2">Account Settings</h1>
       <p class="text-muted-foreground">Manage your profile and preferences</p>
     </div>
@@ -176,7 +177,8 @@
                 />
               {:else}
                 <div
-                  class="w-32 h-32 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-4xl font-bold border-4 border-primary"
+                  class="w-32 h-32 rounded-full bg-primary text-primary-foreground flex items-center
+                  justify-center text-4xl font-bold border-4 border-primary"
                 >
                   {profile.username.charAt(0).toUpperCase()}
                 </div>
@@ -193,7 +195,8 @@
               />
               <label
                 for="avatar-upload"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-secondary/80 text-foreground font-medium rounded-lg transition-colors"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-secondary/80 text-foreground
+                  font-medium rounded-lg transition-colors"
                 class:cursor-pointer={!avatarUpdating}
                 class:cursor-not-allowed={avatarUpdating}
                 class:opacity-50={avatarUpdating}
@@ -208,7 +211,8 @@
               {#if avatarFile && !avatarUpdating}
                 <button
                   on:click={uploadAvatar}
-                  class="ml-3 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg transition-colors cursor-pointer"
+                  class="ml-3 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium
+                    rounded-lg transition-colors cursor-pointer"
                 >
                   Upload Avatar
                 </button>
@@ -238,7 +242,8 @@
                 type="text"
                 value={profile.username}
                 disabled
-                class="w-full px-4 py-2 bg-muted border border-border rounded-lg text-muted-foreground cursor-not-allowed"
+                class="w-full px-4 py-2 bg-muted border border-border rounded-lg text-muted-foreground
+                  cursor-not-allowed"
                 id="username"
               />
               <p class="mt-1 text-xs text-muted-foreground">
@@ -256,7 +261,9 @@
               <input
                 type="text"
                 bind:value={profileForm.display_name}
-                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
+                  placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
+                  focus:border-transparent"
                 placeholder="Your display name"
                 id="display_name"
                 disabled={profileUpdating}
@@ -273,7 +280,9 @@
               <input
                 type="email"
                 bind:value={profileForm.email}
-                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
+                  placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
+                  focus:border-transparent"
                 placeholder="your.email@example.com"
                 id="email"
                 disabled={profileUpdating}
@@ -289,14 +298,14 @@
               </div>
               <Button
                 type="submit"
+                size="icon"
                 class="hover cursor-pointer"
                 disabled={profileUpdating}
               >
                 {#if profileUpdating}
                   <Spinner />
-                  Saving...
                 {:else}
-                  Save Changes
+                  <Save strokeWidth={1.5} class="size-3/5" />
                 {/if}
               </Button>
             </div>
@@ -324,7 +333,9 @@
                 type="password"
                 bind:value={passwordForm.current_password}
                 required
-                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
+                  placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
+                  focus:border-transparent"
                 placeholder="Enter current password"
                 id="current_password"
                 disabled={passwordUpdating}
@@ -342,7 +353,9 @@
                 type="password"
                 bind:value={passwordForm.new_password}
                 required
-                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
+                  placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
+                  focus:border-transparent"
                 placeholder="Enter new password"
                 id="new_password"
                 disabled={passwordUpdating}
@@ -360,7 +373,9 @@
                 type="password"
                 bind:value={passwordForm.confirm_password}
                 required
-                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
+                  placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
+                  focus:border-transparent"
                 placeholder="Confirm new password"
                 id="confirm_password"
                 disabled={passwordUpdating}
@@ -370,12 +385,16 @@
             <div
               class="flex items-center pt-4 border-t border-border justify-end"
             >
-              <Button type="submit" disabled={passwordUpdating}>
+              <Button
+                type="submit"
+                size="icon"
+                class="hover cursor-pointer"
+                disabled={passwordUpdating}
+              >
                 {#if passwordUpdating}
                   <Spinner />
-                  Saving...
                 {:else}
-                  Save Changes
+                  <Save strokeWidth={1.5} class="size-3/5" />
                 {/if}
               </Button>
             </div>
