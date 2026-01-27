@@ -7,30 +7,37 @@
   import { toast } from "svelte-sonner";
   import type { UserProfile } from "$lib/types/shared";
   import Save from "@lucide/svelte/icons/save";
+  import Pencil from "@lucide/svelte/icons/pencil";
 
-  let loading = false;
-  let profile: UserProfile | null = null;
-  let avatarUpdating = false;
-  let profileUpdating = false;
-  let passwordUpdating = false;
-  let profileError = "";
+  // avatar input states
+  const AVATAR_IDLE = 0;
+  const AVATAR_UPLOADING = 1;
+  const AVATAR_SAVE = 2;
+
+  let avatarInputState = $state(AVATAR_IDLE);
+  let loading = $state(false);
+  let profile: UserProfile | null = $state(null);
+  let profileUpdating = $state(false);
+  let passwordUpdating = $state(false);
+  let profileError = $state("");
 
   // profile form
-  let profileForm = {
+  let profileForm = $state({
     display_name: "",
     email: "",
-  };
+  });
 
   // password form
-  let passwordForm = {
+  let passwordForm = $state({
     current_password: "",
     new_password: "",
     confirm_password: "",
-  };
+  });
 
   // avatar upload
-  let avatarFile: File | null = null;
-  let avatarPreview: string | null = null;
+  let avatarFile: File | null = $state(null);
+  let avatarPreview: string | null = $state(null);
+  let avatarInputEl: HTMLInputElement | null = $state(null);
 
   // load user profile
   async function loadProfile() {
@@ -119,13 +126,14 @@
         avatarPreview = e.target?.result as string;
       };
       reader.readAsDataURL(avatarFile);
+      avatarInputState = AVATAR_SAVE;
     }
   }
 
   // upload avatar
   async function uploadAvatar() {
     if (!avatarFile) return;
-    avatarUpdating = true;
+    avatarInputState = AVATAR_UPLOADING;
     try {
       profileError = "";
       const formData = new FormData();
@@ -135,7 +143,7 @@
     } catch (err: any) {
       profileError = err.message;
     } finally {
-      avatarUpdating = false;
+      avatarInputState = AVATAR_IDLE;
     }
   }
 
@@ -168,55 +176,55 @@
             Profile Picture
           </h2>
           <div class="flex items-center gap-6">
-            <div class="relative">
+            <div class="relative w-32 h-32">
               {#if avatarPreview}
                 <img
                   src={avatarPreview}
                   alt="Avatar"
-                  class="w-32 h-32 rounded-full object-cover border-4 border-primary"
+                  class="w-32 h-32 rounded-full object-cover
+                    border-4 {avatarInputState === AVATAR_SAVE
+                    ? 'border-destructive'
+                    : 'border-primary'}"
                 />
               {:else}
                 <div
                   class="w-32 h-32 rounded-full bg-primary text-primary-foreground flex items-center
-                  justify-center text-4xl font-bold border-4 border-primary"
+                    justify-center text-4xl font-bold border-4 border-primary"
                 >
                   {profile.username.charAt(0).toUpperCase()}
                 </div>
               {/if}
-            </div>
-            <div class="flex-1">
+              <!-- edit avatar icon button -->
+              <label class="absolute bottom-2 right-2 cursor-pointer">
+                <Button
+                  size="icon-sm"
+                  type="button"
+                  variant="secondary"
+                  class="cursor-pointer bg-secondary/75 hover:bg-secondary/90"
+                  disabled={avatarInputState === AVATAR_UPLOADING}
+                  onclick={() =>
+                    avatarInputState === AVATAR_SAVE
+                      ? uploadAvatar()
+                      : avatarInputEl && avatarInputEl.click()}
+                >
+                  {#if avatarInputState === AVATAR_UPLOADING}
+                    <Spinner size="sm" class="text-primary-foreground" />
+                  {:else if avatarInputState === AVATAR_SAVE}
+                    <Save class="size-3/5" />
+                  {:else}
+                    <Pencil class="size-1/2" />
+                  {/if}
+                </Button>
+              </label>
               <input
                 type="file"
                 accept="image/*"
-                on:change={handleAvatarSelect}
+                onchange={handleAvatarSelect}
                 class="hidden"
                 id="avatar-upload"
-                disabled={avatarUpdating}
+                disabled={avatarInputState === AVATAR_UPLOADING}
+                bind:this={avatarInputEl}
               />
-              <label
-                for="avatar-upload"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-secondary/80 text-foreground
-                  font-medium rounded-lg transition-colors"
-                class:cursor-pointer={!avatarUpdating}
-                class:cursor-not-allowed={avatarUpdating}
-                class:opacity-50={avatarUpdating}
-              >
-                {#if avatarUpdating}
-                  <Spinner size="sm" class="text-primary-foreground" />
-                  <span>Saving...</span>
-                {:else}
-                  Choose Image
-                {/if}
-              </label>
-              {#if avatarFile && !avatarUpdating}
-                <button
-                  on:click={uploadAvatar}
-                  class="ml-3 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium
-                    rounded-lg transition-colors cursor-pointer"
-                >
-                  Upload Avatar
-                </button>
-              {/if}
             </div>
           </div>
         </div>
@@ -227,7 +235,10 @@
             Profile Information
           </h2>
           <form
-            on:submit|preventDefault={updateProfileInfo}
+            onsubmit={(e) => {
+              e.preventDefault();
+              updateProfileInfo();
+            }}
             class="space-y-4"
             autocomplete="off"
           >
@@ -318,7 +329,10 @@
             Change Password
           </h2>
           <form
-            on:submit|preventDefault={updatePassword}
+            onsubmit={(e) => {
+              e.preventDefault();
+              updatePassword();
+            }}
             class="space-y-4"
             autocomplete="off"
           >
