@@ -161,7 +161,6 @@
     <!-- header -->
     <div class="mb-2">
       <h1 class="text-3xl font-bold text-foreground mb-2">Account Settings</h1>
-      <p class="text-muted-foreground">Manage your profile and preferences</p>
     </div>
 
     <ErrorBox error={profileError} />
