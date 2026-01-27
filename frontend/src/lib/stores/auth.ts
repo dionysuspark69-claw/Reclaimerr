@@ -1,5 +1,5 @@
 import { writable } from "svelte/store";
-import type { User } from "$lib/types/shared";
+import type { UserProfile } from "$lib/types/shared";
 import type { AuthState } from "$lib/types/auth";
 
 function createAuthStore() {
@@ -105,7 +105,7 @@ function createAuthStore() {
     },
 
     // update user info (e.g., after profile update)
-    updateUser: (user: User) => {
+    updateUser: (user: UserProfile) => {
       update((state) => ({
         ...state,
         user,
