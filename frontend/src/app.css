@@ -13,14 +13,16 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.129 0.042 264.695);
   --primary: oklch(0.635 0.192 277.366); /* Indigo-500: #6366f1 */
+  --primary-hover: oklch(0.57 0.2 277.366); /* Indigo-600 - darker for hover */
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.968 0.007 247.896);
+  --secondary: oklch(94.765% 0.00213 14.404);
   --secondary-foreground: oklch(0.208 0.042 265.755);
   --muted: oklch(0.968 0.007 247.896);
   --muted-foreground: oklch(0.554 0.046 257.417);
   --accent: oklch(0.968 0.007 247.896);
   --accent-foreground: oklch(0.208 0.042 265.755);
   --destructive: oklch(0.577 0.245 27.325);
+  --destructive-secondary: oklch(58.305% 0.23863 28.392 / 0.774);
   --border: oklch(0.929 0.013 255.508);
   --input: oklch(0.929 0.013 255.508);
   --ring: oklch(0.635 0.192 277.366);
@@ -47,6 +49,7 @@
   --popover: oklch(0.22 0.025 265.755);
   --popover-foreground: oklch(0.984 0.003 247.858);
   --primary: oklch(0.635 0.192 277.366); /* Your indigo-500: #6366f1 */
+  --primary-hover: oklch(0.7 0.18 277.366);
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.3 0.035 260.031); /* Lighter secondary */
   --secondary-foreground: oklch(0.984 0.003 247.858);
@@ -54,7 +57,6 @@
   --muted-foreground: oklch(0.704 0.04 256.788);
   --accent: oklch(0.3 0.035 260.031);
   --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.65 0.24 25); /* Brighter red */
   --border: oklch(1 0 0 / 12%); /* Slightly more visible */
   --input: oklch(1 0 0 / 18%);
   --ring: oklch(0.635 0.192 277.366); /* Match primary */
@@ -85,6 +87,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -93,6 +96,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-secondary: var(--destructive-secondary);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
