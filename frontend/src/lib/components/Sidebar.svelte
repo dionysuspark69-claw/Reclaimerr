@@ -15,6 +15,9 @@
   import HardDrive from "@lucide/svelte/icons/hard-drive";
   import { toTitleCase } from "$lib/utils/strings";
 
+  // optional callback to close sidebar on mobile after navigation
+  let { onNavigate = () => {} }: { onNavigate?: () => void } = $props();
+
   // nav items: path = route path, label = display text, icon = icon component
   const navItems = [
     { path: "/", label: "Dashboard", icon: House },
@@ -39,7 +42,7 @@
   }
 </script>
 
-<aside class="w-64 bg-card border-r border-border flex flex-col">
+<aside class="w-64 bg-card border-r border-border flex flex-col h-full">
   <!-- logo -->
   <div class="p-6 border-b border-border">
     <div class="flex items-center gap-3">
@@ -63,6 +66,7 @@
       <a
         href={item.path}
         use:link
+        onclick={onNavigate}
         class="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200
                {isActive(item.path)
           ? 'bg-primary text-primary-foreground'
@@ -83,11 +87,13 @@
           >
             <!-- user avatar -->
             {#if $auth.user.avatar_url}
-              <img
-                src={$auth.user.avatar_url}
-                alt="Avatar"
-                class="w-10 h-10 rounded-full object-cover border-3 border-primary"
-              />
+              <div>
+                <img
+                  src={$auth.user.avatar_url}
+                  alt="Avatar"
+                  class="w-10 h-10 rounded-full object-cover border-3 border-primary"
+                />
+              </div>
             {:else}
               <div
                 class="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center
