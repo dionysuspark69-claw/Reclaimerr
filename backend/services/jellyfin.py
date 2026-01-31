@@ -605,3 +605,16 @@ class JellyfinService:
             )
             for data in series_data.values()
         ]
+
+    @staticmethod
+    async def test_service(url: str, api_key: str) -> bool:
+        """Test Jellyfin service connection without full initialization."""
+        async with niquests.AsyncSession() as session:
+            response = await session.get(
+                f"{url.rstrip('/')}/System/Info",
+                headers={"X-Emby-Token": api_key},
+            )
+            response.raise_for_status()
+            if response.status_code == 200:
+                return True
+            raise ValueError(f"Unexpected status code: {response.status_code}")

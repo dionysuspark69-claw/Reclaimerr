@@ -385,3 +385,16 @@ class SonarrClient:
             raise ValueError(
                 f"Failed to delete season {season_number} files for series {series_id} (status: {status_code})"
             )
+
+    @staticmethod
+    async def test_service(url: str, api_key: str) -> bool:
+        """Test Sonarr service connection without full initialization."""
+        async with niquests.AsyncSession() as session:
+            response = await session.get(
+                f"{url.rstrip('/')}/api/v3/health",
+                headers={"X-Api-Key": api_key},
+            )
+            response.raise_for_status()
+            if response.status_code == 200:
+                return True
+            raise ValueError(f"Unexpected status code: {response.status_code}")

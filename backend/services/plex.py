@@ -470,3 +470,16 @@ class PlexService:
                 tvdb=tvdb_id,
             )
         return None
+
+    @staticmethod
+    async def test_service(url: str, api_key: str) -> bool:
+        """Test Plex service connection without full initialization."""
+        async with niquests.AsyncSession() as session:
+            response = await session.get(
+                url,
+                headers={"X-Plex-Token": api_key},
+            )
+            response.raise_for_status()
+            if response.status_code == 200:
+                return True
+            raise ValueError(f"Unexpected status code: {response.status_code}")

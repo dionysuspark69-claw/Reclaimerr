@@ -262,3 +262,16 @@ class SeerrClient:
         media_id = await self.get_media_id(tmdb_id, MediaType.SERIES)
         if media_id:
             await self.delete_media(media_id)
+
+    @staticmethod
+    async def test_service(url: str, api_key: str) -> bool:
+        """Test Seerr service connection without full initialization."""
+        async with niquests.AsyncSession() as session:
+            response = await session.get(
+                f"{url.rstrip('/')}/api/v1/auth/me",
+                headers={"X-Api-Key": api_key},
+            )
+            response.raise_for_status()
+            if response.status_code == 200:
+                return True
+            raise ValueError(f"Unexpected status code: {response.status_code}")
