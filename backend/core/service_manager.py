@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import niquests.exceptions as niq_exceptions
+import urllib3.exceptions as url3_exceptions
+
 from backend.core.logger import LOG
 from backend.enums import Service
 from backend.services.jellyfin import JellyfinService
@@ -60,6 +63,40 @@ class ServiceManager:
             "sonarr": self._sonarr is not None,
             "seerr": self._seerr is not None,
         }
+
+    async def test_service(
+        self, service_type: Service, url: str, api_key: str
+    ) -> tuple[bool, str]:
+        """Test if the specified service is initialized."""
+        try:
+            if service_type is Service.JELLYFIN:
+                return await JellyfinService.test_service(url, api_key), ""
+            elif service_type is Service.PLEX:
+                return await PlexService.test_service(url, api_key), ""
+            elif service_type is Service.RADARR:
+                return await RadarrClient.test_service(url, api_key), ""
+            elif service_type is Service.SONARR:
+                return await SonarrClient.test_service(url, api_key), ""
+            elif service_type is Service.SEERR:
+                return await SeerrClient.test_service(url, api_key), ""
+        except niq_exceptions.ConnectionError:
+            return (
+                False,
+                "Could not connect to the server. Please check the URL and network.",
+            )
+        except url3_exceptions.NameResolutionError:
+            return False, "Could not resolve the server address. Please check the URL."
+        except niq_exceptions.HTTPError:
+            return False, "Invalid API key or server error."
+        except niq_exceptions.Timeout:
+            return False, "Connection timed out. The server may be down or unreachable."
+        except niq_exceptions.TooManyRedirects:
+            return False, "Too many redirects. Please check the server URL."
+        except niq_exceptions.InvalidURL:
+            return False, "Invalid URL. Please check the address."
+        except Exception as e:
+            LOG.error(f"Unexpected error testing {service_type}: {e}")
+            return False, "An unknown error occurred while testing the service."
 
     async def return_service(
         self, service_type: Service
