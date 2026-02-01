@@ -14,7 +14,7 @@ from backend.core.service_manager import service_manager
 from backend.database import get_db
 from backend.database.models import ServiceConfig, ServiceMediaLibrary, User
 from backend.enums import Service
-from backend.models.settings import ServiceConfigRequest, ServiceConfigUpdate
+from backend.models.settings import ServiceConfigUpdate
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -60,7 +60,7 @@ async def get_service_settings(
 
 @router.post("/save/service", tags=["settings"])
 async def set_service_settings(
-    data: ServiceConfigRequest,
+    data: ServiceConfigUpdate,
     _current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -151,7 +151,7 @@ async def _toggle_service(data: ServiceConfigUpdate) -> None:
 
 @router.post("/test/service", tags=["settings"])
 async def test_service_settings(
-    data: ServiceConfigRequest,
+    data: ServiceConfigUpdate,
     _current_user: Annotated[User, Depends(get_current_user)],
 ) -> dict:
     """Test service settings for a given service."""
