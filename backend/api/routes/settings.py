@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -14,7 +14,8 @@ from backend.core.service_manager import service_manager
 from backend.database import get_db
 from backend.database.models import ServiceConfig, ServiceMediaLibrary, User
 from backend.enums import Service
-from backend.models.settings import ServiceConfigUpdate
+from backend.models.settings import ServiceConfigUpdate, UpdateMediaLibrariesRequest
+from backend.tasks.sync import sync_service_libraries
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -204,3 +205,16 @@ async def test_service_settings(
         "message": f"{data.service_type} settings tested successfully",
         "data": data,
     }
+
+
+@router.post("/update/libraries")
+async def update_libraries(
+    data: UpdateMediaLibrariesRequest,
+    _current_user: Annotated[User, Depends(get_current_user)],
+) -> dict[Literal[Service.PLEX, Service.JELLYFIN], list[dict[str, Any]]]:
+    """
+    Update libraries from Jellyfin and Plex.
+
+    Returns the updated libraries for each service.
+    """
+    return await sync_service_libraries(data.service_type)

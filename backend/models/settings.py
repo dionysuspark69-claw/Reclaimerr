@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, model_validator
 
 from backend.enums import Service
@@ -16,3 +18,7 @@ class ServiceConfigUpdate(BaseModel):
         self.base_url = self.base_url.strip()
         self.api_key = self.api_key.strip()
         return self
+
+
+class UpdateMediaLibrariesRequest(BaseModel):
+    service_type: Literal[Service.PLEX, Service.JELLYFIN] | None = None

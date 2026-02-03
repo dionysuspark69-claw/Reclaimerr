@@ -10,6 +10,7 @@
   import Save from "@lucide/svelte/icons/save";
   import Wrench from "@lucide/svelte/icons/wrench";
   import Bell from "@lucide/svelte/icons/bell";
+  import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import JellyfinSVG from "$lib/components/svgs/JellyfinSVG.svelte";
   import PlexSVG from "$lib/components/svgs/PlexSVG.svelte";
   import RadarrSVG from "$lib/components/svgs/RadarrSVG.svelte";
@@ -192,6 +193,16 @@
     } finally {
       savingService = false;
     }
+
+    // if enabling Jellyfin or Plex, sync libraries after a short delay
+    if (
+      serviceId === ServiceType.Jellyfin ||
+      (serviceId === ServiceType.Plex && config.enabled)
+    ) {
+      setTimeout(async () => {
+        await syncServiceLibraries(serviceId as ServiceType);
+      }, 500);
+    }
   }
 
   // load service settings
@@ -244,6 +255,35 @@
       }
     } catch (err: any) {
       toast.warning(`Error loading settings: ${err.message}`);
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function syncServiceLibraries(serviceId: ServiceType | null) {
+    console.log("syncing libraries for", serviceId);
+    try {
+      loading = true;
+      const response: Record<
+        ServiceType,
+        Array<{
+          id: number;
+          library_id: string;
+          library_name: string;
+          media_type: string;
+          selected: boolean;
+        }>
+      > = await post_api("/api/settings/update/libraries", {
+        service_type: serviceId,
+      });
+      const updatedLibraries = response[serviceId as ServiceType];
+      // reload settings to get updated libraries
+      await loadServiceSettings();
+      toast.success(
+        `Successfully synced ${updatedLibraries.length} libraries!`,
+      );
+    } catch (err: any) {
+      toast.error(`Error syncing libraries: ${err.message}`);
     } finally {
       loading = false;
     }
@@ -305,7 +345,15 @@
             <hr class="h-1 my-4 border-muted-foreground" />
 
             <div class="flex flex-col justify-between mb-4">
-              <h2 class="text-xl font-semibold text-foreground">Libraries</h2>
+              <!-- sync libraries -->
+              <div class="flex items-center justify-between">
+                <h2 class="text-xl font-semibold text-foreground">Libraries</h2>
+                <Button
+                  class="cursor-pointer"
+                  onclick={() => syncServiceLibraries(activeTab)}
+                  >Sync <RefreshCw /></Button
+                >
+              </div>
               <p class="mt-1 text-xs text-muted-foreground">
                 Select which libraries to manage
               </p>
