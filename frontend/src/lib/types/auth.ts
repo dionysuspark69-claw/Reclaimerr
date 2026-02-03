@@ -1,8 +1,8 @@
-import type { User } from "$lib/types/shared";
+import type { UserProfile } from "$lib/types/shared";
 
 export interface AuthState {
   isAuthenticated: boolean;
-  user: User | null;
+  user: UserProfile | null;
   token: string | null;
   loading: boolean;
 }
