@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { get_api, post_api } from "$lib/api";
   import ServiceConfigForm from "$lib/components/settings/ServiceConfigForm.svelte";
+  import Notifications from "$lib/components/settings/Notifications.svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
   import { Switch } from "$lib/components/ui/switch/index.js";
@@ -22,6 +23,7 @@
   import { toTitleCase } from "$lib/utils/strings";
   import type { LibraryType } from "$lib/types/shared";
   import { MediaType, ServiceType } from "$lib/types/shared";
+  import { auth } from "$lib/stores/auth";
 
   interface ServiceConfig {
     enabled: boolean;
@@ -312,8 +314,47 @@
     {:else}
       <!-- service tabs -->
       <div class="bg-card rounded-lg border border-border p-6">
-        <!-- buttons -->
-        <div class="border-b border-secondary mb-6">
+        <!-- mobile dropdown -->
+        <div class="md:hidden mb-6">
+          <label for="settings-tab-select" class="sr-only">
+            Select Settings Tab
+          </label>
+          <div class="relative">
+            <select
+              id="settings-tab-select"
+              bind:value={activeTab}
+              class="w-full px-4 py-3 bg-background border border-input rounded-lg text-foreground
+                     appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring
+                     focus:border-transparent pr-10"
+            >
+              {#each tabs as tab}
+                <option value={tab.id}>
+                  {tab.label}
+                </option>
+              {/each}
+            </select>
+            <div
+              class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground"
+            >
+              <svg
+                class="size-5"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 
+                  01-1.414 0l-4-4a1 1 0 010-1.414z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- desktop tabs -->
+        <div class="hidden md:block border-b border-secondary mb-6">
           <div class="flex gap-2 overflow-x-auto">
             {#each tabs as tab}
               <Button
@@ -355,7 +396,7 @@
                 <Button
                   class="cursor-pointer"
                   onclick={() => syncServiceLibraries(activeTab)}
-                  >Sync <RefreshCw /></Button
+                  ><RefreshCw /> Sync</Button
                 >
               </div>
               <p class="mt-1 text-xs text-muted-foreground">
@@ -397,6 +438,34 @@
 
             <hr class="h-1 my-4 border-muted-foreground" />
           {/if}
+
+          <!-- action buttons for service tabs -->
+          <div class="flex gap-3 justify-end">
+            <Button
+              onclick={() => testServiceConnection(activeTab)}
+              disabled={testingService || savingService}
+              class="cursor-pointer gap-2"
+            >
+              {#if testingService}
+                <Spinner class="size-4" />
+              {:else}
+                <TestTube class="size-4" />
+              {/if}
+              Test
+            </Button>
+            <Button
+              onclick={() => saveServiceSettings(activeTab)}
+              disabled={savingService || testingService}
+              class="cursor-pointer gap-2"
+            >
+              {#if savingService}
+                <Spinner class="size-4" />
+              {:else}
+                <Save class="size-4" />
+              {/if}
+              Save
+            </Button>
+          </div>
 
           <!-- general settings #TODO: we'll implement this eventually... -->
         {:else if activeTab === ServiceType.General}
@@ -446,41 +515,11 @@
               </div>
             </div>
           </div> -->
-
-          <!-- notifications #TODO -->
+          
+        <!-- notifications -->
         {:else if activeTab === ServiceType.Notifications}
-          <p class="text-gray-400">Notification settings will go here.</p>
+          <Notifications userRole={$auth.user?.role || "user"} />
         {/if}
-
-        <!-- button box -->
-        <div class="flex gap-3 pt-4 justify-end">
-          {#if serviceTabs.includes(activeTab)}
-            <Button
-              size="icon"
-              class="cursor-pointer"
-              onclick={() => testServiceConnection(activeTab)}
-              disabled={testingService || savingService}
-            >
-              {#if testingService}
-                <Spinner class="size-3/5" />
-              {:else}
-                <TestTube class="size-3/5" />
-              {/if}
-            </Button>
-          {/if}
-          <Button
-            size="icon"
-            class="cursor-pointer"
-            onclick={() => saveServiceSettings(activeTab)}
-            disabled={savingService || testingService}
-          >
-            {#if savingService}
-              <Spinner class="size-3/5" />
-            {:else}
-              <Save class="size-3/5" />
-            {/if}
-          </Button>
-        </div>
       </div>
     {/if}
   </div>
