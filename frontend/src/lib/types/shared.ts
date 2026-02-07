@@ -33,3 +33,23 @@ export type LibraryType = {
   mediaType: MediaType;
   selected: boolean;
 };
+
+export interface NotificationSetting {
+  id: number;
+  enabled: boolean;
+  name: string | null;
+  url: string;
+  newCleanupCandidates: boolean;
+  requestApproved: boolean;
+  requestDeclined: boolean;
+  adminMessage: boolean;
+  taskFailure: boolean;
+}
+
+export enum NotificationType {
+  NewCleanupCandidates = "new_cleanup_candidates",
+  RequestApproved = "request_approved",
+  RequestDeclined = "request_declined",
+  AdminMessage = "admin_message",
+  TaskFailure = "task_failure",
+}

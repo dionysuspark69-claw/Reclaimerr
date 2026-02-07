@@ -49,42 +49,43 @@ class User(Base):
         DateTime, server_default=func.now(), onupdate=func.now(), init=False
     )
 
-#     # relationships
-#     notification_settings: Mapped[list[NotificationSetting]] = relationship(
-#         back_populates="user", default_factory=list, lazy="noload", repr=False
-#     )
+    # relationships
+    notification_settings: Mapped[list[NotificationSetting]] = relationship(
+        back_populates="user", default_factory=list, lazy="noload", repr=False
+    )
 
 
-# class NotificationSetting(Base):
-#     """Notification settings for vacuumerr."""
+class NotificationSetting(Base):
+    """Notification settings for vacuumerr."""
 
-#     __tablename__ = "notification_settings"
+    __tablename__ = "notification_settings"
 
-#     id: Mapped[int] = mapped_column(
-#         Integer, primary_key=True, init=False, autoincrement=True
-#     )
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, init=False, autoincrement=True
+    )
 
-#     # relationships
-#     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-#     user: Mapped[User] = relationship(
-#         back_populates="notification_settings", init=False, lazy="noload", repr=False
-#     )
+    # relationships
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    user: Mapped[User] = relationship(
+        back_populates="notification_settings", init=False, lazy="noload", repr=False
+    )
 
-#     enabled: Mapped[bool] = mapped_column(Boolean)
-#     url: Mapped[str] = mapped_column(String(500))
+    enabled: Mapped[bool] = mapped_column(Boolean)
+    url: Mapped[str] = mapped_column(String(500))
+    name: Mapped[str | None] = mapped_column(String(100), default=None)
 
-#     # notification types
-#     new_cleanup_candidates: Mapped[bool] = mapped_column(Boolean, default=False)
-#     request_approved: Mapped[bool] = mapped_column(Boolean, default=False)
-#     request_declined: Mapped[bool] = mapped_column(Boolean, default=False)
-#     admin_message: Mapped[bool] = mapped_column(Boolean, default=False)
-#     # admin notification types
-#     task_failure: Mapped[bool] = mapped_column(Boolean, default=False)
+    # notification types
+    new_cleanup_candidates: Mapped[bool] = mapped_column(Boolean, default=False)
+    request_approved: Mapped[bool] = mapped_column(Boolean, default=False)
+    request_declined: Mapped[bool] = mapped_column(Boolean, default=False)
+    admin_message: Mapped[bool] = mapped_column(Boolean, default=False)
+    # admin notification types
+    task_failure: Mapped[bool] = mapped_column(Boolean, default=False)
 
-#     # last updated
-#     updated_at: Mapped[datetime] = mapped_column(
-#         DateTime, server_default=func.now(), onupdate=func.now(), init=False
-#     )
+    # last updated
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), init=False
+    )
 
 
 class ServiceConfig(Base):
