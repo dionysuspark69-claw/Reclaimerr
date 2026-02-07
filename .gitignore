@@ -26,6 +26,7 @@ logs
 
 # misc
 data/
+scraps/
 
 # node stuff
 npm-debug.log*
