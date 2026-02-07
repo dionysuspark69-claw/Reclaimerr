@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated, Any, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -14,13 +14,12 @@ from backend.core.service_manager import service_manager
 from backend.database import get_db
 from backend.database.models import ServiceConfig, ServiceMediaLibrary, User
 from backend.enums import Service
-from backend.models.settings import ServiceConfigUpdate, UpdateMediaLibrariesRequest
-from backend.tasks.sync import sync_service_libraries
+from backend.models.settings import ServiceConfigUpdate
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+router = APIRouter(tags=["settings", "services"])
 
 
-@router.get("/services", tags=["settings"])
+@router.get("/services")
 async def get_service_settings(
     _current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
@@ -75,7 +74,7 @@ async def get_service_settings(
     }
 
 
-@router.post("/save/service", tags=["settings"])
+@router.post("/save/service")
 async def set_service_settings(
     data: ServiceConfigUpdate,
     _current_user: Annotated[User, Depends(get_current_user)],
@@ -198,7 +197,7 @@ async def _upsert_service_libraries(
     await db.commit()
 
 
-@router.post("/test/service", tags=["settings"])
+@router.post("/test/service")
 async def test_service_settings(
     data: ServiceConfigUpdate,
     _current_user: Annotated[User, Depends(get_current_user)],
@@ -213,16 +212,3 @@ async def test_service_settings(
         "message": f"{data.service_type} settings tested successfully",
         "data": data,
     }
-
-
-@router.post("/update/libraries")
-async def update_libraries(
-    data: UpdateMediaLibrariesRequest,
-    _current_user: Annotated[User, Depends(get_current_user)],
-) -> dict[Literal[Service.PLEX, Service.JELLYFIN], list[dict[str, Any]]]:
-    """
-    Update libraries from Jellyfin and Plex.
-
-    Returns the updated libraries for each service.
-    """
-    return await sync_service_libraries(data.service_type)
