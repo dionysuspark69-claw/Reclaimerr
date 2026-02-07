@@ -307,9 +307,11 @@
     </div>
 
     {#if loading}
-      <div class="p-8 text-center text-muted-foreground">
-        <Spinner size="lg" class="text-primary" />
-        <p class="mt-4">Loading settings...</p>
+      <div
+        class="flex p-8 items-center justify-center text-center gap-3 text-muted-foreground"
+      >
+        <Spinner class="size-5" />
+        Loading settings...
       </div>
     {:else}
       <!-- service tabs -->
@@ -515,8 +517,8 @@
               </div>
             </div>
           </div> -->
-          
-        <!-- notifications -->
+
+          <!-- notifications -->
         {:else if activeTab === ServiceType.Notifications}
           <Notifications userRole={$auth.user?.role || "user"} />
         {/if}
