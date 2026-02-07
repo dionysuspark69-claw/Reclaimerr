@@ -35,3 +35,13 @@ class SeerrRequestStatus(Enum):
     DECLINED = 3
     FAILED = 4
     COMPLETED = 5
+
+
+class NotificationType(StrEnum):
+    NEW_CLEANUP_CANDIDATES = auto()
+    REQUEST_APPROVED = auto()
+    REQUEST_DECLINED = auto()
+    ADMIN_MESSAGE = auto()
+
+    # admin exclusive notifications
+    TASK_FAILURE = auto()
