@@ -5,7 +5,7 @@ from backend.core import __version__
 router = APIRouter(prefix="/api/info", tags=["info"])
 
 
-@router.get("/api/version")
+@router.get("/version")
 async def get_version() -> dict[str, str]:
     """Get application version."""
     return {
