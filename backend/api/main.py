@@ -13,6 +13,7 @@ from backend.api.routes.account import router as account_router
 from backend.api.routes.auth import router as auth_router
 from backend.api.routes.dashboard import router as dashboard_router
 from backend.api.routes.info import router as info_router
+from backend.api.routes.rules import router as rules_router
 from backend.api.routes.settings import router as settings_router
 from backend.api.routes.tasks import router as tasks_router
 from backend.core.logger import LOG
@@ -125,6 +126,7 @@ app.include_router(info_router)
 app.include_router(settings_router)
 app.include_router(dashboard_router)
 app.include_router(auth_router)
+app.include_router(rules_router)
 app.include_router(account_router)
 app.include_router(radarr.router)
 app.include_router(tasks_router)
