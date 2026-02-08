@@ -123,14 +123,6 @@
 
   // delete rule
   async function deleteRule(rule: CleanupRule) {
-    if (
-      !confirm(
-        `Are you sure you want to delete the rule "${rule.name}"? This action cannot be undone.`,
-      )
-    ) {
-      return;
-    }
-
     try {
       await delete_api(`/api/rules/${rule.id}`);
       rules = rules.filter((r) => r.id !== rule.id);
