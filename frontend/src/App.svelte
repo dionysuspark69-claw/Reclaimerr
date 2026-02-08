@@ -7,6 +7,7 @@
   import Dashboard from "./routes/Dashboard.svelte";
   import Movies from "./routes/Movies.svelte";
   import Series from "./routes/Series.svelte";
+  import Rules from "./routes/Rules.svelte";
   import Users from "./routes/Users.svelte";
   import Account from "./routes/Account.svelte";
   import Settings from "./routes/Settings.svelte";
@@ -18,8 +19,9 @@
 
   const routes = {
     "/": Dashboard,
-    "/movies": Movies,
-    "/series": Series,
+    // "/movies": Movies,
+    // "/series": Series,
+    "/rules": Rules,
     "/users": Users,
     "/account": Account,
     "/settings": Settings,
