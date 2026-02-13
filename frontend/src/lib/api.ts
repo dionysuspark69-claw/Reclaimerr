@@ -76,6 +76,29 @@ export async function post_api<T>(url: string, data: any): Promise<T> {
 }
 
 /**
+ * helper for PUT requests
+ */
+export async function put_api<T>(url: string, data: any): Promise<T> {
+  const isFormData = data instanceof FormData;
+
+  const response = await fetchAPI(url, {
+    method: "PUT",
+    body: isFormData ? data : JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ detail: "Request failed" }));
+    throw new Error(
+      error.detail || `Request failed with status ${response.status}`,
+    );
+  }
+
+  return response.json();
+}
+
+/**
  * helper for DELETE requests
  */
 export async function delete_api<T>(url: string): Promise<T> {
