@@ -2,7 +2,7 @@
   import { link, location } from "svelte-spa-router";
   import { auth } from "../stores/auth";
   import ThemeToggle from "./ThemeToggle.svelte";
-  import logoImage from "../assets/vacuumerr.png";
+  import logoImage from "../assets/logo.png";
   import { VERSION } from "$lib/version";
   import House from "@lucide/svelte/icons/house";
   import ClapperBoard from "@lucide/svelte/icons/clapperboard";

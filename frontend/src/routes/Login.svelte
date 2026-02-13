@@ -1,6 +1,6 @@
 <script lang="ts">
   import { auth } from "$lib/stores/auth";
-  import logoImage from "$lib/assets/vacuumerr.png";
+  import logoImage from "$lib/assets/logo.png";
 
   let username = "";
   let password = "";
