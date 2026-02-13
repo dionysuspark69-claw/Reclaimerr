@@ -3,6 +3,7 @@
   import { get_api, post_api } from "$lib/api";
   import ServiceConfigForm from "$lib/components/settings/ServiceConfigForm.svelte";
   import Notifications from "$lib/components/settings/Notifications.svelte";
+  import Tasks from "$lib/components/settings/Tasks.svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
   import { Switch } from "$lib/components/ui/switch/index.js";
@@ -11,6 +12,7 @@
   import Save from "@lucide/svelte/icons/save";
   import Wrench from "@lucide/svelte/icons/wrench";
   import Bell from "@lucide/svelte/icons/bell";
+  import CalendarClock from "@lucide/svelte/icons/calendar-clock";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import JellyfinSVG from "$lib/components/svgs/JellyfinSVG.svelte";
   import PlexSVG from "$lib/components/svgs/PlexSVG.svelte";
@@ -77,6 +79,7 @@
       baseUrlPlaceholder: "e.g. http://localhost:5055",
     },
     { id: ServiceType.General, label: "General", icon: Wrench },
+    { id: ServiceType.Tasks, label: "Tasks", icon: CalendarClock },
     { id: ServiceType.Notifications, label: "Notifications", icon: Bell },
   ];
 
@@ -110,6 +113,10 @@
       libraries: [],
     },
     [ServiceType.General]: {
+      config: { enabled: false, baseUrl: "", apiKey: "" },
+      libraries: [],
+    },
+    [ServiceType.Tasks]: {
       config: { enabled: false, baseUrl: "", apiKey: "" },
       libraries: [],
     },
@@ -518,6 +525,10 @@
               </div>
             </div>
           </div> -->
+
+          <!-- tasks -->
+        {:else if activeTab === ServiceType.Tasks}
+          <Tasks />
 
           <!-- notifications -->
         {:else if activeTab === ServiceType.Notifications}
