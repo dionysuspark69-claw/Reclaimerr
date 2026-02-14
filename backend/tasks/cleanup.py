@@ -8,7 +8,8 @@ from backend.core.service_manager import service_manager
 from backend.core.settings import settings
 from backend.database import async_db, get_db
 from backend.database.models import CleanupCandidate, CleanupRule, Movie, Series
-from backend.enums import MediaType
+from backend.enums import MediaType, Task
+from backend.tasks.task_tracker import track_task_execution
 
 __all__ = (
     "scan_cleanup_candidates",
@@ -19,9 +20,6 @@ __all__ = (
 
 async def scan_cleanup_candidates() -> None:
     """Scan media libraries and identify cleanup candidates based on configured rules."""
-    from backend.enums import Task
-    from backend.tasks.task_tracker import track_task_execution
-
     LOG.info("Starting cleanup candidates scan")
 
     async with track_task_execution(Task.SCAN_CLEANUP_CANDIDATES):
@@ -379,32 +377,33 @@ async def tag_cleanup_candidates() -> None:
 
     LOG.info(f"Starting cleanup candidate tagging (tag: {settings.cleanup_tag})")
 
-    try:
-        movies_tagged = 0
-        movies_untagged = 0
-        series_tagged = 0
-        series_untagged = 0
+    async with track_task_execution(Task.TAG_CLEANUP_CANDIDATES):
+        try:
+            movies_tagged = 0
+            movies_untagged = 0
+            series_tagged = 0
+            series_untagged = 0
 
-        # process Radarr movies
-        if service_manager.radarr:
-            tagged, untagged = await _sync_radarr_tags()
-            movies_tagged = tagged
-            movies_untagged = untagged
+            # process Radarr movies
+            if service_manager.radarr:
+                tagged, untagged = await _sync_radarr_tags()
+                movies_tagged = tagged
+                movies_untagged = untagged
 
-        # process Sonarr series
-        if service_manager.sonarr:
-            tagged, untagged = await _sync_sonarr_tags()
-            series_tagged = tagged
-            series_untagged = untagged
+            # process Sonarr series
+            if service_manager.sonarr:
+                tagged, untagged = await _sync_sonarr_tags()
+                series_tagged = tagged
+                series_untagged = untagged
 
-        LOG.info(
-            f"Tag sync completed: Movies ({movies_tagged} tagged, {movies_untagged} untagged), "
-            f"Series ({series_tagged} tagged, {series_untagged} untagged)"
-        )
+            LOG.info(
+                f"Tag sync completed: Movies ({movies_tagged} tagged, {movies_untagged} untagged), "
+                f"Series ({series_tagged} tagged, {series_untagged} untagged)"
+            )
 
-    except Exception as e:
-        LOG.error(f"Error syncing cleanup tags: {e}", exc_info=True)
-        raise
+        except Exception as e:
+            LOG.error(f"Error syncing cleanup tags: {e}", exc_info=True)
+            raise
 
 
 async def _sync_radarr_tags() -> tuple[int, int]:
@@ -594,25 +593,34 @@ async def delete_cleanup_candidates() -> None:
     """
     LOG.info("Starting cleanup candidate deletion")
 
-    try:
-        movies_deleted = 0
-        series_deleted = 0
+    async with track_task_execution(Task.DELETE_CLEANUP_CANDIDATES):
+        try:
+            movies_deleted = 0
+            series_deleted = 0
 
-        # process movies
-        if service_manager.radarr or service_manager.jellyfin or service_manager.plex:
-            movies_deleted = await _delete_movie_candidates()
+            # process movies
+            if (
+                service_manager.radarr
+                or service_manager.jellyfin
+                or service_manager.plex
+            ):
+                movies_deleted = await _delete_movie_candidates()
 
-        # process series
-        if service_manager.sonarr or service_manager.jellyfin or service_manager.plex:
-            series_deleted = await _delete_series_candidates()
+            # process series
+            if (
+                service_manager.sonarr
+                or service_manager.jellyfin
+                or service_manager.plex
+            ):
+                series_deleted = await _delete_series_candidates()
 
-        LOG.info(
-            f"Deletion completed: {movies_deleted} movies, {series_deleted} series removed"
-        )
+            LOG.info(
+                f"Deletion completed: {movies_deleted} movies, {series_deleted} series removed"
+            )
 
-    except Exception as e:
-        LOG.error(f"Error deleting cleanup candidates: {e}", exc_info=True)
-        raise
+        except Exception as e:
+            LOG.error(f"Error deleting cleanup candidates: {e}", exc_info=True)
+            raise
 
 
 async def _delete_movie_candidates() -> int:
