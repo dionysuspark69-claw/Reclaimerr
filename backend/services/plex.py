@@ -13,10 +13,10 @@ from tenacity import (
 )
 
 from backend.core.logger import LOG
+from backend.core.utils.request import should_retry_on_status
 from backend.enums import Service
 from backend.models.media import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
 from backend.models.services.plex import PlexMovie, PlexSeries
-from backend.services.utils.retry import should_retry_on_status
 
 
 class PlexService:

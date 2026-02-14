@@ -13,6 +13,7 @@ from tenacity import (
 )
 
 from backend.core.logger import LOG
+from backend.core.utils.request import should_retry_on_status
 from backend.enums import Service
 from backend.models.media import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
 from backend.models.services.jellyfin import (
@@ -21,7 +22,6 @@ from backend.models.services.jellyfin import (
     JellyfinUser,
     JellyfinUserData,
 )
-from backend.services.utils.retry import should_retry_on_status
 
 
 class JellyfinService:

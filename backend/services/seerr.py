@@ -12,9 +12,9 @@ from tenacity import (
     wait_exponential,
 )
 
+from backend.core.utils.request import should_retry_on_status
 from backend.enums import MediaType, SeerrRequestStatus
 from backend.models.services.seerr import SeerrPageInfo, SeerrRequest
-from backend.services.utils.retry import should_retry_on_status
 
 
 def build_seerr_request_from_dict(data: dict[str, Any]) -> SeerrRequest:

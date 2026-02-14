@@ -9,9 +9,9 @@ from tenacity import (
     wait_exponential,
 )
 
+from backend.core.utils.request import should_retry_on_status
 from backend.models.media import ArrTag
 from backend.models.services.sonarr import SonarrSeason, SonarrSeries
-from backend.services.utils.retry import should_retry_on_status
 
 
 def build_sonarr_series_from_dict(data: dict) -> SonarrSeries:
