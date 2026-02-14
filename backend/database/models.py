@@ -411,7 +411,7 @@ class TaskRun(Base):
 
     task: Mapped[Task] = mapped_column(Enum(Task))
     status: Mapped[TaskStatus] = mapped_column(
-        Enum(TaskStatus), default=TaskStatus.PENDING
+        Enum(TaskStatus), default=TaskStatus.SCHEDULED
     )
 
     # relationship to task schedule

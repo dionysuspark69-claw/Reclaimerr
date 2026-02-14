@@ -255,9 +255,9 @@ async def list_tasks(
         status_str, error = (
             get_task_status(db_schedule.task)
             if db_schedule
-            else (TaskStatus.PENDING.value, None)
+            else (TaskStatus.SCHEDULED.value, None)
         )
-        status = TaskStatus(status_str) if status_str else TaskStatus.PENDING
+        status = TaskStatus(status_str) if status_str else TaskStatus.SCHEDULED
 
         # get last run timestamp from DB for display purposes only
         last_task_run = await _get_last_task_run(db, task.id, task_schedule_id)
@@ -344,7 +344,7 @@ async def task_status(
     # get status from in-memory tracker (with TTL for completed/failed)
     task_enum = Task(task_id)
     status_str, error = get_task_status(task_enum)
-    status = TaskStatus(status_str) if status_str else TaskStatus.PENDING
+    status = TaskStatus(status_str) if status_str else TaskStatus.SCHEDULED
 
     # get last run timestamp from DB for display purposes only
     result = await db.execute(

@@ -44,7 +44,7 @@ def get_task_status(task: Task) -> tuple[str, str | None]:
     """
     # check if currently running
     if task in _running_tasks:
-        return (TaskStatus.RUNNING.value, None)
+        return (TaskStatus.RUNNING, None)
 
     # check if recently completed/failed (with TTL)
     if task in _recent_completions:
@@ -53,13 +53,13 @@ def get_task_status(task: Task) -> tuple[str, str | None]:
         # check if still within TTL
         elapsed = (datetime.now(timezone.utc) - completed_time).total_seconds() / 60
         if elapsed < COMPLETION_TTL_MINUTES:
-            return (status.value, error)
+            return (status, error)
         else:
             # TTL expired, remove from recent completions
             del _recent_completions[task]
 
     # default: task is scheduled but not active
-    return (TaskStatus.PENDING.value, None)
+    return (TaskStatus.SCHEDULED, None)
 
 
 @asynccontextmanager
@@ -116,13 +116,13 @@ async def track_task_execution(task: Task) -> AsyncGenerator[None, None]:
     except Exception as e:
         # task failed - store in memory and write to DB
         completion_time = datetime.now(timezone.utc)
-        _recent_completions[task] = (TaskStatus.FAILED, completion_time, str(e))
+        _recent_completions[task] = (TaskStatus.ERROR, completion_time, str(e))
 
         async with async_db() as session:
             task_run = TaskRun(
                 task_schedule_id=task_schedule_id,
                 task=task,
-                status=TaskStatus.FAILED,
+                status=TaskStatus.ERROR,
             )
             task_run.started_at = start_time
             task_run.completed_at = completion_time

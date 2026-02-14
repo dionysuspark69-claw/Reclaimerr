@@ -21,10 +21,10 @@ class MediaType(StrEnum):
 
 
 class TaskStatus(StrEnum):
-    PENDING = auto()
-    RUNNING = auto()
+    SCHEDULED = auto()
     COMPLETED = auto()
-    FAILED = auto()
+    ERROR = auto()
+    RUNNING = auto()
     DISABLED = auto()
 
 
@@ -57,10 +57,14 @@ class Task(StrEnum):
     # sync
     SYNC_ALL_MEDIA = auto()
     SYNC_SERVICE_LIBRARIES = auto()
+
     # cleanup
     SCAN_CLEANUP_CANDIDATES = auto()
     TAG_CLEANUP_CANDIDATES = auto()
     DELETE_CLEANUP_CANDIDATES = auto()
+
+    # housekeeping
+    HOUSE_KEEPING = auto()
 
     def friendly_name(self) -> str:
         return self.name.replace("_", " ").title()
