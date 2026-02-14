@@ -1,13 +1,20 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import datetime
 from typing import Any
 
 import niquests
+from tenacity import (
+    retry,
+    retry_if_exception,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from backend.enums import MediaType, SeerrRequestStatus
 from backend.models.services.seerr import SeerrPageInfo, SeerrRequest
+from backend.services.utils.retry import should_retry_on_status
 
 
 def build_seerr_request_from_dict(data: dict[str, Any]) -> SeerrRequest:
@@ -43,45 +50,33 @@ class SeerrClient:
             }
         )
 
+    @retry(
+        stop=stop_after_attempt(4),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=(
+            retry_if_exception_type((ConnectionError, TimeoutError))
+            | retry_if_exception(should_retry_on_status)
+        ),
+    )
     async def _make_request(
         self, method: str, endpoint: str, **kwargs
     ) -> tuple[int, dict | list | None]:
-        """Make HTTP request to Seerr API.
+        """Make HTTP request to Seerr API with automatic retry.
 
         Returns:
             Tuple of (status_code, response_data)
         """
         url = f"{self.base_url}/api/v1/{endpoint}"
-        max_retries = 3
+        response = await self.session.request(method, url, **kwargs)
+        response.raise_for_status()
 
-        for attempt in range(max_retries):
-            try:
-                response = await self.session.request(method, url, **kwargs)
+        status_code = response.status_code
+        if not status_code:
+            raise ValueError("Status code should not be None")
 
-                # retry on rate limit or server error
-                if response.status_code in (429, 503, 502, 504):
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(2**attempt)
-                        continue
-
-                response.raise_for_status()
-
-                status_code = response.status_code
-                if not status_code:
-                    raise ValueError("Status code should not be None")
-
-                if response.content:
-                    return status_code, response.json()
-                return status_code, None
-
-            except (ConnectionError, TimeoutError) as e:
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(2**attempt)
-                    continue
-                raise
-
-        # should never reach here, but satisfy type checker
-        raise RuntimeError("Max retries exceeded")
+        if response.content:
+            return status_code, response.json()
+        return status_code, None
 
     async def health(self) -> bool:
         """Check server health and API key."""

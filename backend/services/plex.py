@@ -1,15 +1,22 @@
 from __future__ import annotations
 
-import asyncio
 import os
 from datetime import datetime
 
 import niquests
+from tenacity import (
+    retry,
+    retry_if_exception,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from backend.core.logger import LOG
 from backend.enums import Service
 from backend.models.media import AggregatedMovieData, AggregatedSeriesData, ExternalIDs
 from backend.models.services.plex import PlexMovie, PlexSeries
+from backend.services.utils.retry import should_retry_on_status
 
 
 class PlexService:
@@ -26,34 +33,21 @@ class PlexService:
             }
         )
 
+    @retry(
+        stop=stop_after_attempt(4),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=(
+            retry_if_exception_type((ConnectionError, TimeoutError))
+            | retry_if_exception(should_retry_on_status)
+        ),
+    )
     async def _make_request(
         self, endpoint: str, params: dict | None = None
     ) -> dict | list:
-        max_retries = 3
-
-        for attempt in range(max_retries):
-            try:
-                response = await self.session.get(
-                    f"{self.plex_url}/{endpoint}", params=params
-                )
-
-                # retry on rate limit or server error
-                if response.status_code in (429, 503, 502, 504):
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(2**attempt)
-                        continue
-
-                response.raise_for_status()
-                return response.json()
-
-            except (ConnectionError, TimeoutError):
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(2**attempt)
-                    continue
-                raise
-
-        # should never reach here, but satisfy type checker
-        raise RuntimeError("Max retries exceeded")
+        """Make HTTP request to Plex API with automatic retry."""
+        response = await self.session.get(f"{self.plex_url}/{endpoint}", params=params)
+        response.raise_for_status()
+        return response.json()
 
     async def health(self) -> bool:
         """Check server health and API key."""
