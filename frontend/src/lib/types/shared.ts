@@ -16,15 +16,19 @@ export enum MediaType {
   Series = "series",
 }
 
-export enum ServiceType {
+export enum SettingsTab {
   Jellyfin = "jellyfin",
   Plex = "plex",
   Radarr = "radarr",
   Sonarr = "sonarr",
   Seerr = "seerr",
   General = "general",
-  Notifications = "notifications",
   Tasks = "tasks",
+  Notifications = "notifications",
+  Account = "account",
+  Rules = "rules",
+  Users = "users",
+  About = "about",
 }
 
 export type LibraryType = {
@@ -32,7 +36,7 @@ export type LibraryType = {
   libraryId: string;
   libraryName: string;
   mediaType: MediaType;
-  serviceType: ServiceType;
+  serviceType: SettingsTab;
   selected: boolean;
 };
 

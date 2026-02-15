@@ -15,7 +15,7 @@
   import { toast } from "svelte-sonner";
   import {
     MediaType,
-    ServiceType,
+    SettingsTab,
     type ReclaimRule,
     type LibraryType,
   } from "$lib/types/shared";
@@ -63,7 +63,7 @@
             libraryId: lib.library_id,
             libraryName: lib.library_name,
             mediaType: lib.media_type,
-            serviceType: ServiceType.Jellyfin,
+            serviceType: SettingsTab.Jellyfin,
             selected: lib.selected,
           });
         });
@@ -75,7 +75,7 @@
             libraryId: lib.library_id,
             libraryName: lib.library_name,
             mediaType: lib.media_type,
-            serviceType: ServiceType.Plex,
+            serviceType: SettingsTab.Plex,
             selected: lib.selected,
           });
         });

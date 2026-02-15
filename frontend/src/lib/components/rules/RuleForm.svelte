@@ -7,7 +7,7 @@
   import * as Card from "$lib/components/ui/card/index.js";
   import {
     MediaType,
-    ServiceType,
+    SettingsTab,
     type ReclaimRule,
     type LibraryType,
   } from "$lib/types/shared";
@@ -269,8 +269,8 @@
                 >
                   <p class="text-sm text-yellow-800 dark:text-yellow-200">
                     <strong>Warning:</strong> This rule references libraries that
-                    are disabled in Settings. They will be removed when you save
-                    this rule.
+                    are disabled in Settings. They will be removed when you save this
+                    rule.
                   </p>
                 </div>
               {/if}
@@ -292,9 +292,9 @@
                     />
                     <div class="flex items-center space-x-1.5">
                       <div class="w-4 h-4 shrink-0">
-                        {#if library.serviceType === ServiceType.Jellyfin}
+                        {#if library.serviceType === SettingsTab.Jellyfin}
                           <JellyfinSVG />
-                        {:else if library.serviceType === ServiceType.Plex}
+                        {:else if library.serviceType === SettingsTab.Plex}
                           <PlexSVG />
                         {/if}
                       </div>
