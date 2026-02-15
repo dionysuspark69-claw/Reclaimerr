@@ -1,4 +1,12 @@
+<script lang="ts">
+  let className: string = "";
+  export { className as class };
+  export let style: string = "";
+</script>
+
 <svg
+  class={className}
+  {style}
   height="216.9"
   viewBox="0 0 216.7 216.9"
   width="216.7"

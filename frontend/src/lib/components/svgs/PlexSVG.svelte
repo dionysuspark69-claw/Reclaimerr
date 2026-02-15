@@ -1,4 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"
+<script lang="ts">
+  let className: string = "";
+  export { className as class };
+  export let style: string = "";
+</script>
+
+<svg
+  class={className}
+  {style}
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
   ><rect width="512" height="512" rx="15%" fill="#282a2d" /><path
     d="M256 70H148l108 186-108 186h108l108-186z"
     fill="#e5a00d"

@@ -1,14 +1,12 @@
-<!-- <?xml version="1.0" encoding="utf-8"?> -->
-<!-- ***** BEGIN LICENSE BLOCK *****
-  - Part of the Jellyfin project (https://jellyfin.media)
-  - 
-  - All copyright belongs to the Jellyfin contributors; a full list can
-  - be found in the file CONTRIBUTORS.md
-  - 
-  - This work is licensed under the Creative Commons Attribution-ShareAlike 4.0 International License.
-  - To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/.
-- ***** END LICENSE BLOCK ***** -->
+<script lang="ts">
+  let className: string = "";
+  export { className as class };
+  export let style: string = "";
+</script>
+
 <svg
+  class={className}
+  {style}
   version="1.1"
   id="icon-transparent"
   xmlns="http://www.w3.org/2000/svg"

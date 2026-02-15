@@ -1,4 +1,12 @@
+<script lang="ts">
+  let className: string = "";
+  export { className as class };
+  export let style: string = "";
+</script>
+
 <svg
+  class={className}
+  {style}
   xmlns="http://www.w3.org/2000/svg"
   width="96"
   height="96"
