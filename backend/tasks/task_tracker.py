@@ -10,6 +10,7 @@ from backend.core.logger import LOG
 from backend.database import async_db
 from backend.database.models import TaskRun, TaskSchedule
 from backend.enums import Task, TaskStatus
+from backend.services.notifications import notify_task_failure
 
 # in memory set to track currently running tasks
 _running_tasks: set[Task] = set()
@@ -131,6 +132,16 @@ async def track_task_execution(task: Task) -> AsyncGenerator[None, None]:
             session.add(task_run)
             await session.commit()
             LOG.error(f"Task {task.friendly_name()} failed: {e}")
+
+            # send notification to admins about task failure
+            try:
+                await notify_task_failure(
+                    task_name=task.friendly_name(),
+                    error_message=str(e),
+                )
+            except Exception as notif_error:
+                # don't let notification failures affect task tracking
+                LOG.error(f"Failed to send task failure notification: {notif_error}")
 
         raise  # raise the exception
 
