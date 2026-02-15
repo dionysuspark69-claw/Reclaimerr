@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { fade } from "svelte/transition";
   import { get_api, post_api, delete_api } from "$lib/api";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
@@ -25,6 +26,11 @@
   let editingRule = $state<ReclaimRule | null>(null);
   let showRuleForm = $state(false);
   let availableLibraries = $state<LibraryType[]>([]);
+
+  // state to trigger new rule info message after creating/updating a rule
+  let newRule = $state(false);
+  let newRuleTimer: ReturnType<typeof setTimeout> | null = null;
+  const newRuleDisplayDuration = 10000; // 10 seconds
 
   // delete dialog states
   let showDeleteDialog = $state(false);
@@ -101,6 +107,13 @@
         toast.success(`Rule "${created.name}" created`);
       }
       closeRuleForm();
+      // debounce newRule ui
+      newRule = true;
+      if (newRuleTimer) clearTimeout(newRuleTimer);
+      newRuleTimer = setTimeout(() => {
+        newRule = false;
+        newRuleTimer = null;
+      }, newRuleDisplayDuration);
     } catch (err: any) {
       toast.error(`Error saving rule: ${err.message}`);
       throw err; // re-throw to prevent form from closing
@@ -262,6 +275,21 @@
         New Rule
       </Button>
     </div>
+
+    <!-- new rule info -->
+    {#if newRule}
+      <div
+        transition:fade
+        class="bg-info-box-bg text-info-box-fg border-info-box-border rounded-lg p-4 mb-6"
+      >
+        <p class="text-center">
+          New candidates will appear next time the <span class="font-semibold"
+            >Scan Cleanup Candidates</span
+          >
+          is run. If you want them sooner, you can manually trigger the scan.
+        </p>
+      </div>
+    {/if}
 
     <!-- loading -->
     {#if loading}

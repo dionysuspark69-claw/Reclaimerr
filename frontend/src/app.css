@@ -117,6 +117,9 @@
   --color-tmdb: #01b4e4;
   --color-movie: #10b981;
   --color-series: #6366f1;
+  --color-info-box-bg: oklch(96.2% 0.044 156.743);
+  --color-info-box-fg: oklch(44.8% 0.119 151.328);
+  --color-info-box-border: oklch(87.1% 0.15 154.449);
 }
 
 @layer base {
