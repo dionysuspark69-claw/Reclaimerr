@@ -295,10 +295,10 @@ class Series(Base):
     )
 
 
-class CleanupRule(Base):
-    """User-defined cleanup rules for movies and series."""
+class ReclaimRule(Base):
+    """User-defined reclaim rules for movies and series."""
 
-    __tablename__ = "cleanup_rules"
+    __tablename__ = "reclaim_rules"
 
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, init=False, autoincrement=True
@@ -357,10 +357,10 @@ class CleanupRule(Base):
     )
 
 
-class CleanupCandidate(Base):
-    """Items identified as candidates for deletion based on cleanup rules."""
+class ReclaimCandidate(Base):
+    """Items identified as candidates for deletion based on reclaim rules."""
 
-    __tablename__ = "cleanup_candidates"
+    __tablename__ = "reclaim_candidates"
 
     id: Mapped[int] = mapped_column(
         Integer, primary_key=True, init=False, autoincrement=True

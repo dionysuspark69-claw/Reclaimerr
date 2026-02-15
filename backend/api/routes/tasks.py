@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.auth import get_current_user, require_admin
 from backend.core.logger import LOG
 from backend.database import get_db
-from backend.database.models import CleanupRule, TaskRun, TaskSchedule, User
+from backend.database.models import ReclaimRule, TaskRun, TaskSchedule, User
 from backend.enums import MediaType, ScheduleType, Task, TaskStatus
 from backend.models.tasks import TaskScheduleRequest
 
@@ -63,7 +63,7 @@ router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 #     """Create a test cleanup rule and optionally trigger a scan."""
 #     try:
 #         # create the cleanup rule
-#         cleanup_rule = CleanupRule(
+#         cleanup_rule = ReclaimRule(
 #             name=request.name,
 #             media_type=request.media_type,
 #             enabled=True,

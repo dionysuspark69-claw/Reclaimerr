@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.auth import require_admin
 from backend.core.logger import LOG
 from backend.database import get_db
-from backend.database.models import CleanupRule, User
+from backend.database.models import ReclaimRule, User
 from backend.models.cleanup import (
     CleanupRuleCreate,
     CleanupRuleResponse,
@@ -23,7 +23,7 @@ async def get_rules(
     db: AsyncSession = Depends(get_db),
 ):
     """Get all cleanup rules."""
-    result = await db.execute(select(CleanupRule))
+    result = await db.execute(select(ReclaimRule))
     rules = result.scalars().all()
     return rules
 
@@ -37,7 +37,7 @@ async def create_rule(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new cleanup rule."""
-    new_rule = CleanupRule(
+    new_rule = ReclaimRule(
         name=rule_data.name,
         media_type=rule_data.media_type,
         enabled=rule_data.enabled,
@@ -76,7 +76,7 @@ async def update_rule(
     db: AsyncSession = Depends(get_db),
 ):
     """Updates an existing cleanup rule."""
-    result = await db.execute(select(CleanupRule).where(CleanupRule.id == rule_id))
+    result = await db.execute(select(ReclaimRule).where(ReclaimRule.id == rule_id))
     rule = result.scalar_one_or_none()
 
     if not rule:
@@ -104,7 +104,7 @@ async def delete_rule(
     db: AsyncSession = Depends(get_db),
 ):
     """Remove a cleanup rule."""
-    result = await db.execute(select(CleanupRule).where(CleanupRule.id == rule_id))
+    result = await db.execute(select(ReclaimRule).where(ReclaimRule.id == rule_id))
     rule = result.scalar_one_or_none()
 
     if not rule:
@@ -129,7 +129,7 @@ async def delete_rule(
 #     db: AsyncSession = Depends(get_db),
 # ):
 #     """Check which rules would be affected by deselecting the given library IDs."""
-#     result = await db.execute(select(CleanupRule))
+#     result = await db.execute(select(ReclaimRule))
 #     all_rules = result.scalars().all()
 
 #     affected_rules = []

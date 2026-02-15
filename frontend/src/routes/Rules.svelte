@@ -15,26 +15,26 @@
   import {
     MediaType,
     ServiceType,
-    type CleanupRule,
+    type ReclaimRule,
     type LibraryType,
   } from "$lib/types/shared";
   import RuleForm from "$lib/components/rules/RuleForm.svelte";
 
   let loading = $state(false);
-  let rules = $state<CleanupRule[]>([]);
-  let editingRule = $state<CleanupRule | null>(null);
+  let rules = $state<ReclaimRule[]>([]);
+  let editingRule = $state<ReclaimRule | null>(null);
   let showRuleForm = $state(false);
   let availableLibraries = $state<LibraryType[]>([]);
 
   // delete dialog states
   let showDeleteDialog = $state(false);
-  let ruleToDelete = $state<CleanupRule | null>(null);
+  let ruleToDelete = $state<ReclaimRule | null>(null);
 
   // load rules from API
   async function loadRules() {
     try {
       loading = true;
-      const response = await get_api<CleanupRule[]>("/api/rules");
+      const response = await get_api<ReclaimRule[]>("/api/rules");
       rules = response;
     } catch (err: any) {
       toast.error(`Error loading rules: ${err.message}`);
@@ -84,11 +84,11 @@
   }
 
   // save rule (create or update)
-  async function handleSaveRule(ruleData: Partial<CleanupRule>) {
+  async function handleSaveRule(ruleData: Partial<ReclaimRule>) {
     try {
       if (editingRule) {
         // update existing rule
-        const updated = await post_api<CleanupRule>(
+        const updated = await post_api<ReclaimRule>(
           `/api/rules/${editingRule.id}`,
           ruleData,
         );
@@ -96,7 +96,7 @@
         toast.success(`Rule "${updated.name}" updated`);
       } else {
         // create new rule
-        const created = await post_api<CleanupRule>("/api/rules", ruleData);
+        const created = await post_api<ReclaimRule>("/api/rules", ruleData);
         rules = [...rules, created];
         toast.success(`Rule "${created.name}" created`);
       }
@@ -108,7 +108,7 @@
   }
 
   // toggle rule enabled/disabled
-  async function toggleRuleEnabled(rule: CleanupRule) {
+  async function toggleRuleEnabled(rule: ReclaimRule) {
     try {
       const updatedRule = { ...rule, enabled: !rule.enabled };
       await post_api(`/api/rules/${rule.id}`, updatedRule);
@@ -122,7 +122,7 @@
   }
 
   // delete rule
-  async function deleteRule(rule: CleanupRule) {
+  async function deleteRule(rule: ReclaimRule) {
     try {
       await delete_api(`/api/rules/${rule.id}`);
       rules = rules.filter((r) => r.id !== rule.id);
@@ -133,7 +133,7 @@
   }
 
   // open form to edit existing rule
-  function editRule(rule: CleanupRule) {
+  function editRule(rule: ReclaimRule) {
     editingRule = rule;
     showRuleForm = true;
   }
@@ -151,7 +151,7 @@
   }
 
   // generate summary text for a rule based on its conditions
-  function getRuleSummary(rule: CleanupRule): string {
+  function getRuleSummary(rule: ReclaimRule): string {
     const conditions: string[] = [];
 
     if (rule.library_ids && rule.library_ids.length > 0) {
@@ -220,7 +220,7 @@
   }
 
   // open delete confirmation dialog
-  function openDeleteDialog(rule: CleanupRule) {
+  function openDeleteDialog(rule: ReclaimRule) {
     ruleToDelete = rule;
     showDeleteDialog = true;
   }

@@ -7,7 +7,7 @@ from backend.core.logger import LOG
 from backend.core.service_manager import service_manager
 from backend.core.settings import settings
 from backend.database import async_db
-from backend.database.models import CleanupCandidate, CleanupRule, Movie, Series
+from backend.database.models import Movie, ReclaimCandidate, ReclaimRule, Series
 from backend.enums import MediaType, NotificationType, Task
 from backend.services.notifications import notify_all_users
 from backend.tasks.task_tracker import track_task_execution
@@ -48,7 +48,7 @@ async def _scan_with_db(db: AsyncSession) -> tuple[int, int] | None:
     try:
         # load all enabled cleanup rules
         result = await db.execute(
-            select(CleanupRule).where(CleanupRule.enabled == True)
+            select(ReclaimRule).where(ReclaimRule.enabled == True)
         )
         rules = result.scalars().all()
 
@@ -88,7 +88,7 @@ async def _scan_with_db(db: AsyncSession) -> tuple[int, int] | None:
 
 
 async def _process_media(
-    db: AsyncSession, rules: list[CleanupRule], media_type: MediaType
+    db: AsyncSession, rules: list[ReclaimRule], media_type: MediaType
 ) -> tuple[int, int]:
     """
     Process movies or series against cleanup rules.
@@ -110,14 +110,14 @@ async def _process_media(
     # fetch all existing candidates for this media type once (avoid N queries in loop)
     if media_type is MediaType.MOVIE:
         result = await db.execute(
-            select(CleanupCandidate).where(
-                CleanupCandidate.media_type == MediaType.MOVIE
+            select(ReclaimCandidate).where(
+                ReclaimCandidate.media_type == MediaType.MOVIE
             )
         )
     else:
         result = await db.execute(
-            select(CleanupCandidate).where(
-                CleanupCandidate.media_type == MediaType.SERIES
+            select(ReclaimCandidate).where(
+                ReclaimCandidate.media_type == MediaType.SERIES
             )
         )
     existing_candidates = result.scalars().all()
@@ -176,7 +176,7 @@ async def _process_media(
                 else:
                     candidate_data["series_id"] = item.id
 
-                candidate = CleanupCandidate(**candidate_data)
+                candidate = ReclaimCandidate(**candidate_data)
                 db.add(candidate)
                 candidates_created += 1
 
@@ -188,7 +188,7 @@ async def _process_media(
 
 
 def _evaluate_rule(
-    item: Movie | Series, rule: CleanupRule, matched_criteria: dict, reasons: list[str]
+    item: Movie | Series, rule: ReclaimRule, matched_criteria: dict, reasons: list[str]
 ) -> bool:
     """
     Evaluate if an item matches a cleanup rule.
@@ -450,8 +450,8 @@ async def _sync_radarr_tags() -> tuple[int, int]:
     async with async_db() as db:
         result = await db.execute(
             select(Movie.radarr_id)
-            .join(CleanupCandidate, Movie.id == CleanupCandidate.movie_id)
-            .where(CleanupCandidate.media_type == MediaType.MOVIE)
+            .join(ReclaimCandidate, Movie.id == ReclaimCandidate.movie_id)
+            .where(ReclaimCandidate.media_type == MediaType.MOVIE)
             .where(Movie.radarr_id.isnot(None))
         )
         candidate_radarr_ids = {row[0] for row in result.all()}
@@ -536,8 +536,8 @@ async def _sync_sonarr_tags() -> tuple[int, int]:
     async with async_db() as db:
         result = await db.execute(
             select(Series.sonarr_id)
-            .join(CleanupCandidate, Series.id == CleanupCandidate.series_id)
-            .where(CleanupCandidate.media_type == MediaType.SERIES)
+            .join(ReclaimCandidate, Series.id == ReclaimCandidate.series_id)
+            .where(ReclaimCandidate.media_type == MediaType.SERIES)
             .where(Series.sonarr_id.isnot(None))
         )
         candidate_sonarr_ids = {row[0] for row in result.all()}
@@ -593,7 +593,7 @@ async def _sync_sonarr_tags() -> tuple[int, int]:
 async def delete_cleanup_candidates() -> None:
     """Delete all cleanup candidates from their respective services.
 
-    Deletion is based purely on CleanupCandidate records in the database.
+    Deletion is based purely on ReclaimCandidate records in the database.
     Tags are optional visual indicators only and do not affect deletion.
 
     Deletion priority:
@@ -642,9 +642,9 @@ async def _delete_movie_candidates() -> int:
     # get all movie candidates from database
     async with async_db() as db:
         result = await db.execute(
-            select(CleanupCandidate)
-            .join(Movie, CleanupCandidate.movie_id == Movie.id)
-            .where(CleanupCandidate.media_type == MediaType.MOVIE)
+            select(ReclaimCandidate)
+            .join(Movie, ReclaimCandidate.movie_id == Movie.id)
+            .where(ReclaimCandidate.media_type == MediaType.MOVIE)
             .where(Movie.removed_at.is_(None))
         )
         candidates = result.scalars().all()
@@ -658,8 +658,8 @@ async def _delete_movie_candidates() -> int:
         # get radarr IDs and build lookup
         result = await db.execute(
             select(Movie.id, Movie.radarr_id, Movie.title, Movie.tmdb_id)
-            .join(CleanupCandidate, Movie.id == CleanupCandidate.movie_id)
-            .where(CleanupCandidate.media_type == MediaType.MOVIE)
+            .join(ReclaimCandidate, Movie.id == ReclaimCandidate.movie_id)
+            .where(ReclaimCandidate.media_type == MediaType.MOVIE)
             .where(Movie.removed_at.is_(None))
         )
         movie_data = {
@@ -705,8 +705,8 @@ async def _delete_movie_candidates() -> int:
 
                     # delete cleanup candidate
                     result = await db.execute(
-                        select(CleanupCandidate).where(
-                            CleanupCandidate.id == movie_info["candidate_id"]
+                        select(ReclaimCandidate).where(
+                            ReclaimCandidate.id == movie_info["candidate_id"]
                         )
                     )
                     candidate = result.scalar_one_or_none()
@@ -747,9 +747,9 @@ async def _delete_series_candidates() -> int:
     # get all series candidates from database
     async with async_db() as db:
         result = await db.execute(
-            select(CleanupCandidate)
-            .join(Series, CleanupCandidate.series_id == Series.id)
-            .where(CleanupCandidate.media_type == MediaType.SERIES)
+            select(ReclaimCandidate)
+            .join(Series, ReclaimCandidate.series_id == Series.id)
+            .where(ReclaimCandidate.media_type == MediaType.SERIES)
             .where(Series.removed_at.is_(None))
         )
         candidates = result.scalars().all()
@@ -763,8 +763,8 @@ async def _delete_series_candidates() -> int:
         # get sonarr IDs and build lookup
         result = await db.execute(
             select(Series.id, Series.sonarr_id, Series.title, Series.tmdb_id)
-            .join(CleanupCandidate, Series.id == CleanupCandidate.series_id)
-            .where(CleanupCandidate.media_type == MediaType.SERIES)
+            .join(ReclaimCandidate, Series.id == ReclaimCandidate.series_id)
+            .where(ReclaimCandidate.media_type == MediaType.SERIES)
             .where(Series.removed_at.is_(None))
         )
         series_data = {
@@ -813,8 +813,8 @@ async def _delete_series_candidates() -> int:
 
                     # delete cleanup candidate
                     result = await db.execute(
-                        select(CleanupCandidate).where(
-                            CleanupCandidate.id == series_info["candidate_id"]
+                        select(ReclaimCandidate).where(
+                            ReclaimCandidate.id == series_info["candidate_id"]
                         )
                     )
                     candidate = result.scalar_one_or_none()
@@ -910,8 +910,8 @@ async def _delete_movies_via_media_server(
                         movie_obj.removed_at = datetime.now(timezone.utc)
 
                     result = await db.execute(
-                        select(CleanupCandidate).where(
-                            CleanupCandidate.id == candidate.id
+                        select(ReclaimCandidate).where(
+                            ReclaimCandidate.id == candidate.id
                         )
                     )
                     cand = result.scalar_one_or_none()
@@ -976,8 +976,8 @@ async def _delete_movies_via_media_server(
                         movie_obj.removed_at = datetime.now(timezone.utc)
 
                     result = await db.execute(
-                        select(CleanupCandidate).where(
-                            CleanupCandidate.id == candidate.id
+                        select(ReclaimCandidate).where(
+                            ReclaimCandidate.id == candidate.id
                         )
                     )
                     cand = result.scalar_one_or_none()
@@ -1079,8 +1079,8 @@ async def _delete_series_via_media_server(
                         series_db.removed_at = datetime.now(timezone.utc)
 
                     result = await db.execute(
-                        select(CleanupCandidate).where(
-                            CleanupCandidate.id == candidate.id
+                        select(ReclaimCandidate).where(
+                            ReclaimCandidate.id == candidate.id
                         )
                     )
                     cand = result.scalar_one_or_none()
@@ -1151,8 +1151,8 @@ async def _delete_series_via_media_server(
                         series_db.removed_at = datetime.now(timezone.utc)
 
                     result = await db.execute(
-                        select(CleanupCandidate).where(
-                            CleanupCandidate.id == candidate.id
+                        select(ReclaimCandidate).where(
+                            ReclaimCandidate.id == candidate.id
                         )
                     )
                     cand = result.scalar_one_or_none()

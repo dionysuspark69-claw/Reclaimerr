@@ -8,7 +8,7 @@
   import {
     MediaType,
     ServiceType,
-    type CleanupRule,
+    type ReclaimRule,
     type LibraryType,
   } from "$lib/types/shared";
   import Save from "@lucide/svelte/icons/save";
@@ -25,14 +25,14 @@
     onSave,
     onCancel,
   }: {
-    rule: CleanupRule | null;
+    rule: ReclaimRule | null;
     libraries: LibraryType[];
-    onSave: (rule: Partial<CleanupRule>) => Promise<void>;
+    onSave: (rule: Partial<ReclaimRule>) => Promise<void>;
     onCancel: () => void;
   } = $props();
 
   // form state - initialize with defaults
-  let formData = $state<Partial<CleanupRule>>({
+  let formData = $state<Partial<ReclaimRule>>({
     name: "",
     media_type: MediaType.Movie,
     enabled: true,

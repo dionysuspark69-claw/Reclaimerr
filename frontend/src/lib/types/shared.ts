@@ -56,7 +56,7 @@ export enum NotificationType {
   TaskFailure = "task_failure",
 }
 
-export interface CleanupRule {
+export interface ReclaimRule {
   id: number;
   name: string;
   media_type: MediaType;
