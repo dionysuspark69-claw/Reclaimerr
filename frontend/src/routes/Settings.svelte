@@ -4,10 +4,16 @@
   import ServiceConfigForm from "$lib/components/settings/ServiceConfigForm.svelte";
   import Notifications from "$lib/components/settings/Notifications.svelte";
   import Tasks from "$lib/components/settings/tasks/Tasks.svelte";
+  import Rules from "$lib/components/settings/rules/Rules.svelte";
+  import Account from "$lib/components/settings/Account.svelte";
+  import Users from "$lib/components/settings/Users.svelte";
+  import About from "$lib/components/settings/About.svelte";
+  import General from "$lib/components/settings/General.svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
   import { Switch } from "$lib/components/ui/switch/index.js";
   import Spinner from "$lib/components/ui/spinner/spinner.svelte";
+  import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import TestTube from "@lucide/svelte/icons/test-tube";
   import Save from "@lucide/svelte/icons/save";
   import Wrench from "@lucide/svelte/icons/wrench";
@@ -21,11 +27,29 @@
   import SeerrSVG from "$lib/components/svgs/SeerrSVG.svelte";
   import Tv from "@lucide/svelte/icons/tv";
   import Clapperboard from "@lucide/svelte/icons/clapperboard";
+  import BookAlert from "@lucide/svelte/icons/book-alert";
+  import UserCog from "@lucide/svelte/icons/user-cog";
+  import Filter from "@lucide/svelte/icons/filter";
+  import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import { toast } from "svelte-sonner";
   import { toTitleCase } from "$lib/utils/strings";
   import type { LibraryType } from "$lib/types/shared";
-  import { MediaType, ServiceType } from "$lib/types/shared";
+  import { MediaType, SettingsTab } from "$lib/types/shared";
   import { auth } from "$lib/stores/auth";
+
+  type Tab = {
+    id: SettingsTab;
+    label: string;
+    icon: any;
+    baseUrlPlaceholder?: string;
+    adminOnly?: boolean;
+  };
+
+  type TabGroup = {
+    label: string;
+    tabs: Tab[];
+    adminOnly?: boolean;
+  };
 
   interface ServiceConfig {
     enabled: boolean;
@@ -40,105 +64,188 @@
 
   // services
   const serviceTabs = [
-    ServiceType.Jellyfin,
-    ServiceType.Plex,
-    ServiceType.Radarr,
-    ServiceType.Sonarr,
-    ServiceType.Seerr,
+    SettingsTab.Jellyfin,
+    SettingsTab.Plex,
+    SettingsTab.Radarr,
+    SettingsTab.Sonarr,
+    SettingsTab.Seerr,
   ];
 
-  const tabs = [
+  // organize tabs into groups
+  const tabGroups: TabGroup[] = [
     {
-      id: ServiceType.Jellyfin,
-      label: "Jellyfin",
-      icon: JellyfinSVG,
-      baseUrlPlaceholder: "e.g. http://localhost:8096",
+      label: "Services",
+      adminOnly: true,
+      tabs: [
+        {
+          id: SettingsTab.Jellyfin,
+          label: "Jellyfin",
+          icon: JellyfinSVG,
+          baseUrlPlaceholder: "e.g. http://localhost:8096",
+          adminOnly: true,
+        },
+        {
+          id: SettingsTab.Plex,
+          label: "Plex",
+          icon: PlexSVG,
+          baseUrlPlaceholder: "e.g. http://localhost:32400",
+          adminOnly: true,
+        },
+        {
+          id: SettingsTab.Radarr,
+          label: "Radarr",
+          icon: RadarrSVG,
+          baseUrlPlaceholder: "e.g. http://localhost:7878",
+          adminOnly: true,
+        },
+        {
+          id: SettingsTab.Sonarr,
+          label: "Sonarr",
+          icon: SonarrSVG,
+          baseUrlPlaceholder: "e.g. http://localhost:8989",
+          adminOnly: true,
+        },
+        {
+          id: SettingsTab.Seerr,
+          label: "Seerr",
+          icon: SeerrSVG,
+          baseUrlPlaceholder: "e.g. http://localhost:5055",
+          adminOnly: true,
+        },
+      ],
     },
     {
-      id: ServiceType.Plex,
-      label: "Plex",
-      icon: PlexSVG,
-      baseUrlPlaceholder: "e.g. http://localhost:32400",
+      label: "System",
+      tabs: [
+        {
+          id: SettingsTab.General,
+          label: "General",
+          icon: Wrench,
+          adminOnly: true,
+        },
+        {
+          id: SettingsTab.Tasks,
+          label: "Tasks",
+          icon: CalendarClock,
+          adminOnly: true,
+        },
+        { id: SettingsTab.Notifications, label: "Notifications", icon: Bell },
+        { id: SettingsTab.Account, label: "Account", icon: UserCog },
+        {
+          id: SettingsTab.Rules,
+          label: "Rules",
+          icon: Filter,
+          adminOnly: true,
+        },
+        {
+          id: SettingsTab.Users,
+          label: "Users",
+          icon: UserCog,
+          adminOnly: true,
+        },
+      ],
     },
     {
-      id: ServiceType.Radarr,
-      label: "Radarr",
-      icon: RadarrSVG,
-      baseUrlPlaceholder: "e.g. http://localhost:7878",
+      label: "Info",
+      tabs: [{ id: SettingsTab.About, label: "About", icon: BookAlert }],
     },
-    {
-      id: ServiceType.Sonarr,
-      label: "Sonarr",
-      icon: SonarrSVG,
-      baseUrlPlaceholder: "e.g. http://localhost:8989",
-    },
-    {
-      id: ServiceType.Seerr,
-      label: "Seerr",
-      icon: SeerrSVG,
-      baseUrlPlaceholder: "e.g. http://localhost:5055",
-    },
-    { id: ServiceType.General, label: "General", icon: Wrench },
-    { id: ServiceType.Tasks, label: "Tasks", icon: CalendarClock },
-    { id: ServiceType.Notifications, label: "Notifications", icon: Bell },
   ];
+
+  // filter tabs based on user role
+  const isAdmin = $derived($auth.user?.role === "admin");
+  const filteredTabGroups = $derived(
+    tabGroups
+      .filter((group) => !group.adminOnly || isAdmin)
+      .map((group) => ({
+        ...group,
+        tabs: group.tabs.filter((tab) => !tab.adminOnly || isAdmin),
+      }))
+      .filter((group) => group.tabs.length > 0),
+  );
+
+  // flatten for easier lookup
+  const tabs: Tab[] = $derived(
+    filteredTabGroups.flatMap((group) => group.tabs),
+  );
 
   // states
   let loading = $state(false);
-  let activeTab = $state(ServiceType.Jellyfin);
   let testingService = $state(false);
   let savingService = $state(false);
 
+  // set initial active tab to first available tab for user
+  let activeTab = $state(
+    $auth.user?.role === "admin"
+      ? SettingsTab.Jellyfin
+      : SettingsTab.Notifications,
+  );
+
   // unified state for each service even though
   // Jellyfin & Plex will be the only ones with libraries
-  let serviceState = $state<Record<ServiceType, ServiceState>>({
-    [ServiceType.Jellyfin]: {
+  let serviceState = $state<Record<SettingsTab, ServiceState>>({
+    [SettingsTab.Jellyfin]: {
       config: { enabled: false, baseUrl: "", apiKey: "" },
       libraries: [],
     },
-    [ServiceType.Plex]: {
+    [SettingsTab.Plex]: {
       config: { enabled: false, baseUrl: "", apiKey: "" },
       libraries: [],
     },
-    [ServiceType.Radarr]: {
+    [SettingsTab.Radarr]: {
       config: { enabled: false, baseUrl: "", apiKey: "" },
       libraries: [],
     },
-    [ServiceType.Sonarr]: {
+    [SettingsTab.Sonarr]: {
       config: { enabled: false, baseUrl: "", apiKey: "" },
       libraries: [],
     },
-    [ServiceType.Seerr]: {
+    [SettingsTab.Seerr]: {
       config: { enabled: false, baseUrl: "", apiKey: "" },
       libraries: [],
     },
-    [ServiceType.General]: {
+    [SettingsTab.General]: {
       config: { enabled: false, baseUrl: "", apiKey: "" },
       libraries: [],
     },
-    [ServiceType.Tasks]: {
+    [SettingsTab.Tasks]: {
       config: { enabled: false, baseUrl: "", apiKey: "" },
       libraries: [],
     },
-    [ServiceType.Notifications]: {
+    [SettingsTab.Notifications]: {
+      config: { enabled: false, baseUrl: "", apiKey: "" },
+      libraries: [],
+    },
+    [SettingsTab.About]: {
+      config: { enabled: false, baseUrl: "", apiKey: "" },
+      libraries: [],
+    },
+    [SettingsTab.Account]: {
+      config: { enabled: false, baseUrl: "", apiKey: "" },
+      libraries: [],
+    },
+    [SettingsTab.Rules]: {
+      config: { enabled: false, baseUrl: "", apiKey: "" },
+      libraries: [],
+    },
+    [SettingsTab.Users]: {
       config: { enabled: false, baseUrl: "", apiKey: "" },
       libraries: [],
     },
   });
 
   // handler for service config changes
-  function handleServiceChange(event: CustomEvent) {
+  const handleServiceChange = (event: CustomEvent) => {
     const { field, value } = event.detail;
     if (field === "enabled") serviceState[activeTab].config.enabled = value;
     else if (field === "baseUrl")
       serviceState[activeTab].config.baseUrl = value;
     else if (field === "apiKey") serviceState[activeTab].config.apiKey = value;
-  }
+  };
 
   // test service connection
-  async function testServiceConnection(serviceId: string) {
+  const testServiceConnection = async (serviceId: string) => {
     testingService = true;
-    const config = serviceState[serviceId as ServiceType].config;
+    const config = serviceState[serviceId as SettingsTab].config;
     try {
       const response: boolean = await post_api("/api/settings/test/service", {
         service_type: serviceId,
@@ -159,14 +266,14 @@
     } finally {
       testingService = false;
     }
-  }
+  };
 
   // save service settings
-  async function saveServiceSettings(serviceId: string) {
+  const saveServiceSettings = async (serviceId: string) => {
     let errorOccurred = false;
     savingService = true;
-    const config = serviceState[serviceId as ServiceType].config;
-    const libraries = serviceState[serviceId as ServiceType].libraries;
+    const config = serviceState[serviceId as SettingsTab].config;
+    const libraries = serviceState[serviceId as SettingsTab].libraries;
     try {
       const response: {
         message: string;
@@ -190,7 +297,7 @@
             : undefined,
       });
       // update state based on response
-      serviceState[serviceId as ServiceType].config = {
+      serviceState[serviceId as SettingsTab].config = {
         enabled: response.data.enabled,
         baseUrl: response.data.base_url,
         apiKey: response.data.api_key,
@@ -209,16 +316,16 @@
     if (
       !errorOccurred &&
       config.enabled &&
-      (serviceId === ServiceType.Jellyfin || serviceId === ServiceType.Plex)
+      (serviceId === SettingsTab.Jellyfin || serviceId === SettingsTab.Plex)
     ) {
       setTimeout(async () => {
-        await syncServiceLibraries(serviceId as ServiceType);
+        await syncServiceLibraries(serviceId as SettingsTab);
       }, 500);
     }
-  }
+  };
 
   // load service settings
-  async function loadServiceSettings() {
+  const loadServiceSettings = async () => {
     try {
       loading = true;
       // fetch service settings
@@ -242,25 +349,25 @@
 
       // loop and map to our services state
       for (const [serviceId, config] of Object.entries(rawServices)) {
-        serviceState[serviceId as ServiceType].config = {
+        serviceState[serviceId as SettingsTab].config = {
           enabled: config.enabled,
           baseUrl: config.base_url, // base_url -> baseUrl
           apiKey: config.api_key, // api_key -> apiKey
         };
         // if plex or jellyfin, load libraries
         if (
-          serviceId === ServiceType.Jellyfin ||
-          serviceId === ServiceType.Plex
+          serviceId === SettingsTab.Jellyfin ||
+          serviceId === SettingsTab.Plex
         ) {
           const rawLibraries = config.libraries || [];
-          serviceState[serviceId as ServiceType].libraries = rawLibraries.map(
+          serviceState[serviceId as SettingsTab].libraries = rawLibraries.map(
             (lib) => ({
               id: lib.id,
               libraryId: lib.library_id,
               libraryName: lib.library_name,
               mediaType:
                 lib.media_type === "movie" ? MediaType.Movie : MediaType.Series,
-              serviceType: serviceId as ServiceType,
+              serviceType: serviceId as SettingsTab,
               selected: lib.selected,
             }),
           );
@@ -271,14 +378,15 @@
     } finally {
       loading = false;
     }
-  }
+  };
 
-  async function syncServiceLibraries(serviceId: ServiceType | null) {
+  // sync libraries for plex/jellyfin
+  const syncServiceLibraries = async (serviceId: SettingsTab | null) => {
     console.log("syncing libraries for", serviceId);
     try {
       loading = true;
       const response: Record<
-        ServiceType,
+        SettingsTab,
         Array<{
           id: number;
           library_id: string;
@@ -289,7 +397,7 @@
       > = await post_api("/api/settings/sync/libraries", {
         service_type: serviceId,
       });
-      const updatedLibraries = response[serviceId as ServiceType];
+      const updatedLibraries = response[serviceId as SettingsTab];
       // reload settings to get updated libraries
       await loadServiceSettings();
       toast.success(
@@ -300,7 +408,13 @@
     } finally {
       loading = false;
     }
-  }
+  };
+
+  // helper to load icon from tabs
+  const getTabIcon = (tabId: SettingsTab) => {
+    const tab = tabs.find((t) => t.id === tabId);
+    return tab ? tab.icon : null;
+  };
 
   // load settings on mount
   onMount(() => {
@@ -364,28 +478,66 @@
         </div>
 
         <!-- desktop tabs -->
-        <div class="hidden md:block border-b border-secondary mb-6">
-          <div class="flex gap-2 overflow-x-auto">
-            {#each tabs as tab}
-              <Button
-                variant="ghost"
-                class="cursor-pointer bg-transparent text-foreground {activeTab ===
-                tab.id
-                  ? 'border-b-4 border-primary rounded-none'
-                  : ''}"
-                onclick={() => (activeTab = tab.id)}
-              >
-                <span class="mr-2"><tab.icon /></span>
-                {tab.label}
-              </Button>
-            {/each}
-          </div>
+        <div class="hidden md:block mb-6">
+          {#if isAdmin}
+            <div class="flex items-center gap-1 border-b border-border pb-2">
+              {#each filteredTabGroups as group, groupIndex}
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger
+                    class="inline-flex items-center justify-center whitespace-nowrap 
+                      rounded-md text-sm font-medium transition-colors focus-visible:outline-none 
+                      focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 
+                      hover:bg-accent hover:text-accent-foreground text-foreground h-9 px-4 py-2 cursor-pointer"
+                  >
+                    {group.label}
+                    <ChevronDown class="ml-1 size-4" />
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content>
+                    {#each group.tabs as tab}
+                      <DropdownMenu.Item
+                        class="cursor-pointer flex items-center gap-2 {activeTab ===
+                        tab.id
+                          ? 'bg-primary/10 text-primary'
+                          : ''}"
+                        onSelect={() => (activeTab = tab.id)}
+                      >
+                        <tab.icon class="size-4" />
+                        {tab.label}
+                      </DropdownMenu.Item>
+                    {/each}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
+
+                {#if groupIndex < filteredTabGroups.length - 1}
+                  <span class="text-muted-foreground">|</span>
+                {/if}
+              {/each}
+            </div>
+          {:else}
+            <!-- regular user view: simple horizontal tabs -->
+            <div class="flex gap-2 border-b border-border">
+              {#each tabs as tab}
+                <Button
+                  variant="ghost"
+                  class="cursor-pointer bg-transparent text-foreground {activeTab ===
+                  tab.id
+                    ? 'border-b-2 border-primary rounded-none'
+                    : ''}"
+                  onclick={() => (activeTab = tab.id)}
+                >
+                  <tab.icon class="mr-2 size-4" />
+                  {tab.label}
+                </Button>
+              {/each}
+            </div>
+          {/if}
         </div>
 
         <!-- settings -->
         {#if serviceTabs.includes(activeTab)}
           <ServiceConfigForm
             tabLabel={tabs.find((t) => t.id === activeTab)?.label || ""}
+            tabIcon={getTabIcon(activeTab)}
             enabled={serviceState[activeTab].config.enabled}
             baseUrl={serviceState[activeTab].config.baseUrl}
             apiKey={serviceState[activeTab].config.apiKey}
@@ -395,7 +547,7 @@
           />
 
           <!-- if plex or jellyfin add additional settings -->
-          {#if activeTab === ServiceType.Jellyfin || activeTab === ServiceType.Plex}
+          {#if activeTab === SettingsTab.Jellyfin || activeTab === SettingsTab.Plex}
             <hr class="h-1 my-4 border-muted-foreground" />
 
             <div class="flex flex-col justify-between mb-4">
@@ -414,7 +566,7 @@
               </p>
             </div>
 
-            {#if activeTab === ServiceType.Jellyfin || activeTab === ServiceType.Plex}
+            {#if activeTab === SettingsTab.Jellyfin || activeTab === SettingsTab.Plex}
               {#if serviceState[activeTab].libraries.length > 0}
                 {#each serviceState[activeTab].libraries as library}
                   <Badge
@@ -477,62 +629,36 @@
             </Button>
           </div>
 
-          <!-- general settings #TODO: we'll implement this eventually... -->
-        {:else if activeTab === ServiceType.General}
-          <!-- <div class="bg-gray-900 rounded-lg border border-gray-800 p-6 mt-6">
-            <h2 class="text-xl font-semibold text-gray-100 mb-4">Additional Settings</h2>
-            
-            <div class="space-y-6">
-              <div>
-                <h3 class="text-sm font-medium text-gray-300 mb-3">Library Management Priority</h3>
-                <p class="text-xs text-gray-500 mb-3">
-                  When multiple services are configured, priority determines which service manages deletions
-                </p>
-                <div class="space-y-2 text-sm text-gray-400">
-                  <div class="flex items-center gap-2">
-                    <span class="text-primary-500 font-medium">1.</span>
-                    <span>Radarr/Sonarr (if configured)</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-primary-500 font-medium">2.</span>
-                    <span>Plex or Jellyfin</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-300 mb-2">Shared Library Detection</label>
-                <select class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                  <option>Auto-detect shared libraries</option>
-                  <option>Prefer Plex for deletions</option>
-                  <option>Prefer Jellyfin for deletions</option>
-                </select>
-                <p class="text-xs text-gray-500 mt-1">
-                  If both Plex and Jellyfin share the same media library, specify which to use for cleanup
-                </p>
-              </div>
-
-              <div>
-                <label class="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" class="w-5 h-5 rounded bg-gray-800 border-gray-700" />
-                  <div>
-                    <span class="text-gray-300">Reset Seerr requests on deletion</span>
-                    <p class="text-xs text-gray-500 mt-1">
-                      Automatically reset user requests in Seerr when media is deleted
-                    </p>
-                  </div>
-                </label>
-              </div>
-            </div>
-          </div> -->
+          <!-- general settings -->
+        {:else if activeTab === SettingsTab.General}
+          <General svgIcon={getTabIcon(activeTab)} />
 
           <!-- tasks -->
-        {:else if activeTab === ServiceType.Tasks}
-          <Tasks />
+        {:else if activeTab === SettingsTab.Tasks}
+          <Tasks svgIcon={getTabIcon(activeTab)} />
 
           <!-- notifications -->
-        {:else if activeTab === ServiceType.Notifications}
-          <Notifications userRole={$auth.user?.role || "user"} />
+        {:else if activeTab === SettingsTab.Notifications}
+          <Notifications
+            userRole={$auth.user?.role || "user"}
+            svgIcon={getTabIcon(activeTab)}
+          />
+
+          <!-- account -->
+        {:else if activeTab === SettingsTab.Account}
+          <Account svgIcon={getTabIcon(activeTab)} />
+
+          <!-- rules -->
+        {:else if activeTab === SettingsTab.Rules}
+          <Rules svgIcon={getTabIcon(activeTab)} />
+
+          <!-- users -->
+        {:else if activeTab === SettingsTab.Users}
+          <Users svgIcon={getTabIcon(activeTab)} />
+
+          <!-- about -->
+        {:else if activeTab === SettingsTab.About}
+          <About svgIcon={getTabIcon(activeTab)} />
         {/if}
       </div>
     {/if}
