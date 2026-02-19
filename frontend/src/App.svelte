@@ -56,7 +56,8 @@
     <div class="flex h-screen bg-background">
       <!-- mobile header bar -->
       <div
-        class="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b border-border px-4 py-3 flex items-center gap-3"
+        class="lg:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b border-border px-4 py-3 flex
+          items-center gap-3"
       >
         <button
           onclick={() => (sidebarOpen = !sidebarOpen)}
