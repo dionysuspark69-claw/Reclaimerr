@@ -1,12 +1,22 @@
-function formatDate(dateString: string): string {
+/**
+ * Formats a date string into a more readable format.
+ * @param dateString The date string to format.
+ * @returns A formatted date string.
+ */
+const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
-}
+};
 
-function formatDistanceToNow(dateString: string): string {
+/**
+ * Formats a date string into a relative time format (e.g., "2 days ago" or "in 3 hours").
+ * @param dateString The date string to format.
+ * @returns A formatted relative time string.
+ */
+const formatDistanceToNow = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -30,6 +40,20 @@ function formatDistanceToNow(dateString: string): string {
   }
 
   return isFuture ? `in ${result}` : `${result} ago`;
-}
+};
 
-export { formatDate, formatDistanceToNow };
+/**
+ * Formats a date string into a locale-specific date string. If the input is null, it returns "Unknown".
+ * @param dateStr The date string to format.
+ * @returns A formatted date string in the locale-specific format, or "Unknown" if the input is null.
+ */
+const formatDateToLocaleString = (dateStr: string | null): string => {
+  if (!dateStr) return "Unknown";
+  try {
+    return new Date(dateStr).toLocaleDateString();
+  } catch {
+    return dateStr;
+  }
+};
+
+export { formatDate, formatDistanceToNow, formatDateToLocaleString };
