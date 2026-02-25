@@ -17,6 +17,8 @@
   import Check from "@lucide/svelte/icons/check";
   import X from "@lucide/svelte/icons/x";
   import { toast } from "svelte-sonner";
+  import { Input } from "$lib/components/ui/input/index.js";
+  import { Textarea } from "$lib/components/ui/textarea/index.js";
 
   interface Props {
     userRole: string;
@@ -43,7 +45,7 @@
   let expandedStates = $state<Record<number, boolean>>({});
   let editingTitle = $state<number | null>(null);
   let editedTitleValue = $state("");
-  let isAdmin = $derived(userRole === "admin" || userRole === "moderator");
+  let isAdmin = $derived(userRole === "admin");
 
   // map enum values to camelCase property keys
   type NotificationKey = keyof Omit<
@@ -413,7 +415,7 @@
                     </div>
                     <div class="flex items-center gap-2">
                       {#if editingTitle === index}
-                        <input
+                        <Input
                           type="text"
                           bind:value={editedTitleValue}
                           onkeydown={(e) => {
@@ -421,9 +423,9 @@
                             if (e.key === "Escape") cancelEditTitle();
                           }}
                           placeholder="Enter a name..."
-                          class="px-3 py-2 bg-background border border-input rounded-lg text-foreground
-                                 focus:outline-none focus:ring-2 focus:ring-ring text-sm flex-1"
-                          maxlength="50"
+                          class="input-hover-el px-3 py-2 bg-background border border-input rounded-lg 
+                            text-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm flex-1"
+                          maxlength={50}
                         />
                         <Button
                           size="icon"
@@ -442,14 +444,14 @@
                           <X />
                         </Button>
                       {:else}
-                        <input
+                        <Input
                           type="text"
                           value={notification.name || ""}
                           readonly
                           disabled
                           placeholder="Click pencil to edit..."
-                          class="px-3 py-2 bg-muted/30 border border-input rounded-lg text-foreground
-                                 text-sm flex-1"
+                          class="px-3 py-2 bg-background border border-input rounded-lg 
+                            text-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm flex-1"
                         />
                         <Button
                           size="icon"
@@ -493,7 +495,7 @@
                   </div>
                   <div class="flex items-center gap-2">
                     {#if editingTitle === index}
-                      <input
+                      <Input
                         type="text"
                         bind:value={editedTitleValue}
                         onkeydown={(e) => {
@@ -501,9 +503,9 @@
                           if (e.key === "Escape") cancelEditTitle();
                         }}
                         placeholder="Enter a name..."
-                        class="px-4 py-2 bg-background border border-input rounded-lg text-foreground
-                               focus:outline-none focus:ring-2 focus:ring-ring text-sm flex-1 max-w-md"
-                        maxlength="50"
+                        class="input-hover-el px-3 py-2 bg-background border border-input rounded-lg 
+                          text-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm flex-1"
+                        maxlength={50}
                       />
                       <Button
                         size="icon"
@@ -522,14 +524,14 @@
                         <X />
                       </Button>
                     {:else}
-                      <input
+                      <Input
                         type="text"
                         value={notification.name || ""}
                         readonly
                         disabled
                         placeholder="Click pencil to edit..."
-                        class="px-4 py-2 bg-muted/30 border border-input rounded-lg text-foreground
-                               text-sm flex-1 max-w-md"
+                        class="px-3 py-2 bg-background border border-input rounded-lg 
+                          text-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm flex-1"
                       />
                       <Button
                         size="icon"
@@ -554,15 +556,13 @@
                   >
                     Apprise URL
                   </label>
-                  <textarea
+                  <Textarea
                     id="url-{index}"
                     bind:value={notification.url}
                     placeholder="e.g., discord://webhook_id/webhook_token or tgram://bot_token/chat_id"
-                    class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
-                           placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
-                           focus:border-transparent font-mono text-sm"
-                    rows="3"
-                  ></textarea>
+                    class="input-hover-el font-mono text-sm"
+                    rows={3}
+                  ></Textarea>
                   <p class="mt-1 text-xs text-muted-foreground">
                     Enter your Apprise-compatible notification URL. See <a
                       href="https://appriseit.com/getting-started/universal-syntax/"
