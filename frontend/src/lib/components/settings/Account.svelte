@@ -9,6 +9,7 @@
   import type { UserProfile } from "$lib/types/shared";
   import Save from "@lucide/svelte/icons/save";
   import Pencil from "@lucide/svelte/icons/pencil";
+  import { Input } from "$lib/components/ui/input/index.js";
 
   interface Props {
     svgIcon: Component | null;
@@ -265,13 +266,14 @@
           >
             Username
           </label>
-          <input
+          <Input
             type="text"
             value={profile.username}
             disabled
-            class="w-full px-4 py-2 bg-muted border border-border rounded-lg text-muted-foreground
-              cursor-not-allowed"
+            class="bg-muted text-muted-foreground cursor-not-allowed"
             id="username"
+            minlength={5}
+            maxlength={32}
           />
           <p class="mt-1 text-xs text-muted-foreground">
             Username cannot be changed
@@ -285,15 +287,15 @@
           >
             Display Name
           </label>
-          <input
+          <Input
             type="text"
             bind:value={profileForm.display_name}
-            class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
-              placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
-              focus:border-transparent"
+            class="input-hover-el"
             placeholder="Your display name"
             id="display_name"
             disabled={profileUpdating}
+            minlength={3}
+            maxlength={32}
           />
         </div>
 
@@ -304,15 +306,15 @@
           >
             Email
           </label>
-          <input
+          <Input
             type="email"
             bind:value={profileForm.email}
-            class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
-              placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
-              focus:border-transparent"
+            class="input-hover-el"
             placeholder="your.email@example.com"
             id="email"
             disabled={profileUpdating}
+            minlength={5}
+            maxlength={120}
           />
         </div>
 
@@ -359,16 +361,16 @@
           >
             Current Password
           </label>
-          <input
+          <Input
             type="password"
             bind:value={passwordForm.current_password}
             required
-            class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
-              placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
-              focus:border-transparent"
+            class="input-hover-el"
             placeholder="Enter current password"
             id="current_password"
             disabled={passwordUpdating}
+            minlength={8}
+            maxlength={64}
           />
         </div>
 
@@ -379,16 +381,16 @@
           >
             New Password
           </label>
-          <input
+          <Input
             type="password"
             bind:value={passwordForm.new_password}
             required
-            class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
-              placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
-              focus:border-transparent"
+            class="input-hover-el"
             placeholder="Enter new password"
             id="new_password"
             disabled={passwordUpdating}
+            minlength={8}
+            maxlength={64}
           />
         </div>
 
@@ -399,16 +401,16 @@
           >
             Confirm New Password
           </label>
-          <input
+          <Input
             type="password"
             bind:value={passwordForm.confirm_password}
             required
-            class="w-full px-4 py-2 bg-background border border-input rounded-lg text-foreground
-              placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring
-              focus:border-transparent"
+            class="input-hover-el"
             placeholder="Confirm new password"
             id="confirm_password"
             disabled={passwordUpdating}
+            minlength={8}
+            maxlength={64}
           />
         </div>
 
