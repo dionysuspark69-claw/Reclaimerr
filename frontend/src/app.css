@@ -135,6 +135,6 @@
   }
 }
 
-.input-hover:hover {
+.input-hover-el:hover {
   @apply border-primary-hover duration-300 transition-colors;
 }
