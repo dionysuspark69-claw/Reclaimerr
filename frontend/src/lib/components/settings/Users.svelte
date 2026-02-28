@@ -217,9 +217,11 @@
       }
 
       // send update request
+      const preEditedUser = { ...editingUser }; // keep a copy since closeEditModal will reset editingUser
       await post_api(`/api/account/users/${editingUser.id}`, updateData);
       closeEditModal();
       await loadUsers();
+      toast.success(`User "${preEditedUser.username}" has been updated.`);
     } catch (err: any) {
       toast.warning(err.message);
     }
@@ -333,8 +335,9 @@
                 </div>
 
                 <div>
-                  <div class="text-sm font-medium text-foreground">
-                    {user.display_name || user.username}
+                  <div class="flex flex-col text-sm font-medium text-foreground">
+                    <span>{user.username}</span>
+                    <span class="text-xs text-muted-foreground italic">{user.display_name}</span>
                   </div>
                   {#if user.email}
                     <div class="text-xs text-muted-foreground">
