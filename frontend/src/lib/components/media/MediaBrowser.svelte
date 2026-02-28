@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { get_api } from "$lib/api";
   import { Input } from "$lib/components/ui/input/index.js";
   import * as Select from "$lib/components/ui/select/index.js";
@@ -29,7 +29,7 @@
   }
   let { mediaType }: Props = $props();
 
-  let loading = $state(false);
+  let loading = $state(true);
   let error = $state("");
   let mediaData = $state<PaginatedResponse<
     MovieWithStatus | SeriesWithStatus
@@ -48,6 +48,13 @@
 
   // debounce timer for search
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // abort control for API requests
+  let abortController: AbortController | null = null;
+
+  // keep track to see if component has mounted to avoid race conditions in
+  // the $effect for sort filters
+  let mounted = $state(false);
 
   // computed values based on mediaType
   const isMovie = $derived(mediaType === MediaType.Movie);
@@ -68,17 +75,24 @@
   $effect(() => {
     sortBy;
     sortOrder;
-    loadMedia();
+    if (mounted) {
+      loadMedia(1);
+    }
   });
 
   // load media from API with filters and pagination
-  const loadMedia = async () => {
-    try {
-      loading = true;
-      error = "";
+  const loadMedia = async (page: number = currentPage) => {
+    if (abortController) abortController.abort();
+    abortController = new AbortController();
+    const signal = abortController.signal;
 
+    loading = true;
+    error = "";
+    currentPage = page;
+
+    try {
       const params = new URLSearchParams({
-        page: currentPage.toString(),
+        page: page.toString(),
         per_page: "50",
         sort_by: sortBy,
         sort_order: sortOrder,
@@ -90,16 +104,24 @@
 
       const data = await get_api<
         PaginatedResponse<MovieWithStatus | SeriesWithStatus>
-      >(`${apiEndpoint}?${params.toString()}`);
+      >(`${apiEndpoint}?${params.toString()}`, signal);
 
-      mediaData = data;
-      console.log("Loaded media data:", data);
+      // only update state if this request was not aborted
+      if (!signal.aborted) {
+        mediaData = data;
+      }
     } catch (err: any) {
+      // ignore abort errors, they are expected
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      // log and show other errors
       console.error(`Error loading ${title.toLowerCase()}:`, err);
       error = err.message;
       toast.error(`Failed to load ${title.toLowerCase()}: ${err.message}`);
     } finally {
-      loading = false;
+      // only stop loading if this request was not aborted
+      if (!signal.aborted) {
+        loading = false;
+      }
     }
   };
 
@@ -112,14 +134,14 @@
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       currentPage = 1;
-      loadMedia();
+      loadMedia(1);
     }, 500);
   };
 
   // when user changes page
   const handlePageChange = (page: number) => {
     currentPage = page;
-    loadMedia();
+    loadMedia(page);
   };
 
   // when user clicks on a media card to view details
@@ -137,15 +159,21 @@
   // after successful exception request, reload media to get updated status
   const handleExceptionSuccess = () => {
     // reload media to get updated status
-    loadMedia();
+    loadMedia(currentPage);
   };
 
   onMount(() => {
-    loadMedia();
+    mounted = true;
+    loadMedia(currentPage);
+  });
+
+  onDestroy(() => {
+    if (searchTimer) clearTimeout(searchTimer);
+    if (abortController) abortController.abort();
   });
 </script>
 
-<div class="p-8">
+<div class="p-2 md:p-8">
   <div class="max-w-450 mx-auto">
     <!-- header -->
     <div class="mb-8">
@@ -172,12 +200,10 @@
       <!-- sort by -->
       <div class="flex flex-1 flex-row gap-4">
         <Select.Root type="single" bind:value={sortBy}>
-          <Select.Trigger
-            class="flex-10 bg-card border-ring text-card-foreground"
-          >
+          <Select.Trigger class="flex-10 bg-card text-card-foreground">
             {sortByOptions.find((opt) => opt.value === sortBy)?.label}
           </Select.Trigger>
-          <Select.Content class="bg-card border-ring">
+          <Select.Content class="bg-card">
             {#each sortByOptions as option}
               <Select.Item
                 value={option.value}
@@ -192,12 +218,10 @@
 
         <!-- sort order -->
         <Select.Root type="single" bind:value={sortOrder}>
-          <Select.Trigger
-            class="flex-10 bg-card border-ring text-card-foreground"
-          >
+          <Select.Trigger class="flex-10 bg-card text-card-foreground">
             {sortOrder === "asc" ? "Ascending" : "Descending"}
           </Select.Trigger>
-          <Select.Content class="bg-card border-ring">
+          <Select.Content class="bg-card">
             <Select.Item
               value="asc"
               label="Ascending"
