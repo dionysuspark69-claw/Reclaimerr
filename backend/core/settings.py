@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from pydantic import Field, field_validator
+from pydantic_core import PydanticCustomError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from backend.core.__version__ import __version__
@@ -43,8 +44,8 @@ class Settings(BaseSettings):
     cors_origins: str = "*"  # comma-separated list or "*" for all
 
     # JWT authentication
-    jwt_secret: str = Field(
-        default="CHANGE_ME_IN_PRODUCTION", description="Secret key for JWT tokens"
+    jwt_secret: str | None = Field(
+        default=None, description="Secret key for JWT tokens"
     )
     jwt_algorithm: str = "HS256"
 
@@ -63,6 +64,16 @@ class Settings(BaseSettings):
             return str(LogLevel(v.upper())).upper()
         except ValueError:
             return "INFO"
+
+    @field_validator("jwt_secret", mode="before")
+    @classmethod
+    def validate_jwt_secret(cls, v: str | None) -> str | None:
+        """Validate JWT secret is set and not empty."""
+        if isinstance(v, str):
+            v = v.strip()
+        if not v:
+            raise PydanticCustomError("jwt_secret", "JWT secret must be set")
+        return v
 
     @property
     def data_dir_path(self) -> Path:
