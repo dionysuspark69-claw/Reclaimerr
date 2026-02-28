@@ -12,10 +12,10 @@ from tenacity import (
     wait_exponential,
 )
 
-from backend.core.logger import LOG, LogLevel
+from backend.core.logger import LOG
 from backend.database import async_db
 from backend.database.models import NotificationSetting, User
-from backend.enums import NotificationType, UserRole
+from backend.enums import LogLevel, NotificationType, UserRole
 
 __all__ = (
     "notify_task_failure",
