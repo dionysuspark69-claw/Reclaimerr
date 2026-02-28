@@ -44,14 +44,5 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
 
     return AuthResponse(
         access_token=access_token,
-        user=UserInfo(
-            id=user.id,
-            username=user.username,
-            display_name=user.display_name,
-            email=user.email,
-            avatar_path=user.avatar_path,
-            role=user.role,
-            created_at=user.created_at,
-            require_password_change=user.require_password_change or False,
-        ),
+        user=UserInfo.from_user(user),
     )
