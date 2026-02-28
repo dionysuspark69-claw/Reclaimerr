@@ -73,6 +73,7 @@
 
   const handleClose = () => {
     reason = "";
+    duration = "30";
     open = false;
     if (onClose) {
       onClose();
