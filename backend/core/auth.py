@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.settings import settings
 from backend.database import get_db
 from backend.database.models import User
-from backend.enums import UserRole
+from backend.enums import Permission, UserRole
 
 # password hashing with Argon2
 argon_ph = PasswordHasher()
@@ -114,3 +114,27 @@ async def require_admin(
             status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
         )
     return current_user
+
+
+def has_permission(user: User, permission: Permission) -> bool:
+    """Check whether user has a specific permission, with admin bypass."""
+    if user.role is UserRole.ADMIN:
+        return True
+    user_permissions = user.permissions or []
+    return permission.value in user_permissions
+
+
+def require_permission(permission: Permission):
+    """Dependency factory requiring a specific permission (admins always pass)."""
+
+    async def _require_permission(
+        current_user: Annotated[User, Depends(get_current_user)],
+    ) -> User:
+        if not has_permission(current_user, permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"{permission.value.replace('_', ' ').title()} permission required",
+            )
+        return current_user
+
+    return _require_permission
