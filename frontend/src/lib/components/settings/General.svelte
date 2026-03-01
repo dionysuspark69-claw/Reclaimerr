@@ -20,6 +20,7 @@
   let { svgIcon }: Props = $props();
 
   // state
+  let loading = $state(true);
   let savingSettings = $state(false);
   let aarrTagging = $state({
     autoTagEnabled: false,
@@ -77,6 +78,8 @@
     } catch (error) {
       console.error("Error fetching general settings:", error);
       toast.error("Failed to load general settings");
+    } finally {
+      loading = false;
     }
   });
 </script>
@@ -94,79 +97,88 @@
     <p class="text-sm text-muted-foreground mt-1">Manage general settings</p>
   </div>
 
-  <!-- arr tagging -->
-  <div class="bg-muted/50 border rounded-lg p-4 shadow-sm mt-6">
-    <h3 class="font-semibold text-foreground items-center mb-3">
-      Aarr Tagging
-      <Tooltip.Root>
-        <Tooltip.Trigger>
-          <Info class="inline size-4 ml-1 text-muted-foreground cursor-help" />
-        </Tooltip.Trigger>
-        <Tooltip.Content>
-          <p>
-            Automatic tagging of reclaimerr candidates for Radarr and Sonarr
-          </p>
-        </Tooltip.Content>
-      </Tooltip.Root>
-    </h3>
+  <!-- check if loading -->
+  {#if loading}
+    <div class="flex justify-center py-8">
+      <Spinner />
+    </div>
+  {:else}
+    <!-- arr tagging -->
+    <div class="bg-muted/50 border rounded-lg p-4 shadow-sm mt-6">
+      <h3 class="font-semibold text-foreground items-center mb-3">
+        Aarr Tagging
+        <Tooltip.Root>
+          <Tooltip.Trigger>
+            <Info
+              class="inline size-4 ml-1 text-muted-foreground cursor-help"
+            />
+          </Tooltip.Trigger>
+          <Tooltip.Content>
+            <p>
+              Automatic tagging of reclaimerr candidates for Radarr and Sonarr
+            </p>
+          </Tooltip.Content>
+        </Tooltip.Root>
+      </h3>
 
-    <!-- automatic tagging toggle -->
-    <div class="flex gap-2 items-center mb-4">
-      <Checkbox
-        id="autoTagEnabled"
-        name="autoTagEnabled"
-        class="cursor-pointer"
-        bind:checked={aarrTagging.autoTagEnabled}
-      />
-      <Label
-        for="autoTagEnabled"
-        class="inline-flex items-center gap-2 cursor-pointer"
-      >
-        <span class="text-sm text-foreground"
-          >Enable automatic tagging of reclaimerr candidates</span
+      <!-- automatic tagging toggle -->
+      <div class="flex gap-2 items-center mb-4">
+        <Checkbox
+          id="autoTagEnabled"
+          name="autoTagEnabled"
+          class="cursor-pointer"
+          bind:checked={aarrTagging.autoTagEnabled}
+        />
+        <Label
+          for="autoTagEnabled"
+          class="inline-flex items-center gap-2 cursor-pointer"
         >
-      </Label>
+          <span class="text-sm text-foreground"
+            >Enable automatic tagging of reclaimerr candidates</span
+          >
+        </Label>
+      </div>
+
+      <!-- cleanup tag suffix -->
+      <div>
+        <Label for="cleanupTagSuffix" class="mb-2">
+          <span class="text-sm text-foreground">Cleanup Tag Suffix</span>
+        </Label>
+        <Input
+          id="cleanupTagSuffix"
+          name="cleanupTagSuffix"
+          type="text"
+          class="input-hover-el placeholder-text-muted-foreground"
+          placeholder="e.g. '-candidate'"
+          maxlength={15}
+          bind:value={aarrTagging.cleanupTagSuffix}
+        />
+        <p class="mt-1 text-xs text-muted-foreground">
+          Optional suffix for cleanup tag (base: 'reclaimerr'). Example:
+          '-candidate' -> 'reclaimerr-candidate'
+        </p>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Note: modifying this will update existing tags during the <span
+            class="font-bold">Tag Cleanup Candidates</span
+          > task.
+        </p>
+      </div>
     </div>
 
-    <!-- cleanup tag suffix -->
-    <div>
-      <Label for="cleanupTagSuffix" class="mb-2">
-        <span class="text-sm text-foreground">Cleanup Tag Suffix</span>
-      </Label>
-      <Input
-        id="cleanupTagSuffix"
-        name="cleanupTagSuffix"
-        type="text"
-        class="input-hover-el placeholder-text-muted-foreground"
-        placeholder="e.g. '-candidate'"
-        maxlength={15}
-        bind:value={aarrTagging.cleanupTagSuffix}
-      />
-      <p class="mt-1 text-xs text-muted-foreground">
-        Optional suffix for cleanup tag (base: 'reclaimerr'). Example:
-        '-candidate' -> 'reclaimerr-candidate'
-      </p>
-      <p class="mt-1 text-xs text-muted-foreground">
-        Note: modifying this will update existing tags during the <span
-          class="font-bold">Tag Cleanup Candidates</span
-        > task.
-      </p>
+    <!-- save -->
+    <div class="flex gap-3 justify-end">
+      <Button
+        onclick={saveSettings}
+        disabled={savingSettings}
+        class="cursor-pointer gap-2"
+      >
+        {#if savingSettings}
+          <Spinner class="size-4" />
+        {:else}
+          <Save class="size-4" />
+        {/if}
+        Save
+      </Button>
     </div>
-  </div>
-
-  <!-- save -->
-  <div class="flex gap-3 justify-end">
-    <Button
-      onclick={saveSettings}
-      disabled={savingSettings}
-      class="cursor-pointer gap-2"
-    >
-      {#if savingSettings}
-        <Spinner class="size-4" />
-      {:else}
-        <Save class="size-4" />
-      {/if}
-      Save
-    </Button>
-  </div>
+  {/if}
 </div>
