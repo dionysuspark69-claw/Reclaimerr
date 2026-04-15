@@ -37,11 +37,9 @@
   };
 
   // derive the main server from loaded libraries (or null if none)
-  let mainServerType = $derived<SettingsTab.Jellyfin | SettingsTab.Plex | null>(
+  let mainServerType = $derived<SettingsTab.Plex | null>(
     localLibraries.length > 0
-      ? (localLibraries[0].serviceType as
-          | SettingsTab.Jellyfin
-          | SettingsTab.Plex)
+      ? (localLibraries[0].serviceType as SettingsTab.Plex)
       : null,
   );
 
@@ -51,19 +49,6 @@
       const services = await get_api<any>("/api/settings/services");
       const result: LibraryType[] = [];
 
-      if (services.jellyfin?.libraries && services.jellyfin?.is_main) {
-        services.jellyfin.libraries.forEach((lib: any) => {
-          result.push({
-            id: lib.id,
-            libraryId: lib.library_id,
-            libraryName: lib.library_name,
-            mediaType:
-              lib.media_type === "movie" ? MediaType.Movie : MediaType.Series,
-            serviceType: SettingsTab.Jellyfin,
-            selected: lib.selected,
-          });
-        });
-      }
       if (services.plex?.libraries && services.plex?.is_main) {
         services.plex.libraries.forEach((lib: any) => {
           result.push({
@@ -94,11 +79,7 @@
     try {
       // detect main server type from existing config
       const services = await get_api<any>("/api/settings/services");
-      const mainServiceType = services.jellyfin?.is_main
-        ? SettingsTab.Jellyfin
-        : services.plex?.is_main
-          ? SettingsTab.Plex
-          : null;
+      const mainServiceType = services.plex?.is_main ? SettingsTab.Plex : null;
 
       if (!mainServiceType) {
         toast.warning("No main media server configured.");

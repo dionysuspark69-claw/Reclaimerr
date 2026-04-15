@@ -64,6 +64,21 @@ class PlexService:
         except Exception:
             return False
 
+    @retry(
+        stop=stop_after_attempt(4),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=(
+            retry_if_exception_type((ConnectionError, TimeoutError, ReadTimeout))
+            | retry_if_exception(should_retry_on_status)
+        ),
+    )
+    async def _delete_request(self, rating_key: str) -> None:
+        """Make HTTP DELETE request with automatic retry."""
+        response = await self.session.delete(
+            f"{self.plex_url}/library/metadata/{rating_key}"
+        )
+        response.raise_for_status()
+
     async def delete_item(self, rating_key: str) -> None:
         """Delete an item (movie or series) from Plex.
 
@@ -71,10 +86,7 @@ class PlexService:
             rating_key: Plex rating key (item ID)
         """
         try:
-            response = await self.session.delete(
-                f"{self.plex_url}/library/metadata/{rating_key}"
-            )
-            response.raise_for_status()
+            await self._delete_request(rating_key)
             LOG.debug(f"Deleted Plex item {rating_key}")
         except Exception as e:
             raise ValueError(f"Failed to delete Plex item {rating_key}: {e}")

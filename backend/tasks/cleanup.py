@@ -1045,19 +1045,11 @@ async def delete_cleanup_candidates() -> None:
             season_deleted = 0
 
             # process movies
-            if (
-                service_manager.radarr
-                or service_manager.jellyfin
-                or service_manager.plex
-            ):
+            if service_manager.radarr or service_manager.plex:
                 movies_deleted = await _delete_movie_candidates()
 
             # process series
-            if (
-                service_manager.sonarr
-                or service_manager.jellyfin
-                or service_manager.plex
-            ):
+            if service_manager.sonarr or service_manager.plex:
                 series_deleted = await _delete_series_candidates()
                 season_deleted = await _delete_season_candidates()
 
@@ -1368,12 +1360,8 @@ async def _delete_season_candidates(
 
         # fall back to media server if Sonarr failed or unavailable
         if not deleted_via_sonarr:
-            media_service = service_manager.jellyfin or service_manager.plex
-            season_service_id = (
-                season.jellyfin_season_id
-                if service_manager.jellyfin
-                else season.plex_season_rating_key
-            )
+            media_service = service_manager.plex
+            season_service_id = season.plex_season_rating_key
             if media_service and season_service_id:
                 try:
                     await media_service.delete_item(season_service_id)
@@ -1477,14 +1465,7 @@ async def _delete_movies_via_media_server(
 
     if main_cfg:
         main_service_type = main_cfg.service_type
-        main_service = (
-            service_manager.jellyfin
-            if main_service_type == Service.JELLYFIN
-            else service_manager.plex
-        )
-    elif service_manager.jellyfin:
-        main_service_type = Service.JELLYFIN
-        main_service = service_manager.jellyfin
+        main_service = service_manager.plex
     elif service_manager.plex:
         main_service_type = Service.PLEX
         main_service = service_manager.plex
@@ -1614,83 +1595,7 @@ async def _delete_series_via_media_server(
         )
         series = {s.id: s for s in result.scalars().all()}
 
-    # prioritize Jellyfin over Plex
-    if service_manager.jellyfin:
-        deleted_paths = []
-
-        for candidate in remaining_candidates:
-            series_obj = series.get(candidate.series_id)
-            if not series_obj or not series_obj.tmdb_id:
-                continue
-
-            ref = next(
-                (r for r in series_obj.service_refs if r.service == Service.JELLYFIN),
-                None,
-            )
-            if not ref:
-                LOG.debug(
-                    f"Series '{series_obj.title}' not found in Jellyfin (no service ref)"
-                )
-                continue
-
-            try:
-                await service_manager.jellyfin.delete_item(ref.service_id)
-
-                # track service-specific path for scanning (from database)
-                if ref.path:
-                    deleted_paths.append(ref.path)
-
-                # mark as removed and delete candidate
-                async with async_db() as db:
-                    result = await db.execute(
-                        select(Series).where(Series.id == candidate.series_id)
-                    )
-                    series_db = result.scalar_one_or_none()
-                    if series_db:
-                        series_db.removed_at = datetime.now(timezone.utc)
-
-                    result = await db.execute(
-                        select(ReclaimCandidate).where(
-                            ReclaimCandidate.id == candidate.id
-                        )
-                    )
-                    cand = result.scalar_one_or_none()
-                    if cand:
-                        await db.delete(cand)
-
-                    # reset seerr request
-                    if service_manager.seerr and series_obj.tmdb_id:
-                        try:
-                            await _reset_seerr_request(
-                                series_obj.tmdb_id, MediaType.SERIES
-                            )
-                        except Exception as e:
-                            LOG.warning(
-                                f"Failed to reset Seerr request for {series_obj.title}: {e}"
-                            )
-
-                    await db.commit()
-
-                deleted_count += 1
-                LOG.info(f"Deleted series '{series_obj.title}' via Jellyfin")
-
-            except Exception as e:
-                LOG.error(
-                    f"Failed to delete series '{series_obj.title}' via Jellyfin: {e}"
-                )
-
-        # trigger path-specific library scans after all deletions
-        if deleted_paths:
-            LOG.info(
-                f"Triggering Jellyfin scans for {len(deleted_paths)} deleted series paths"
-            )
-            for path in deleted_paths:
-                try:
-                    await service_manager.jellyfin.scan_item_path(path)
-                except Exception as e:
-                    LOG.warning(f"Failed to trigger Jellyfin scan for {path}: {e}")
-
-    elif service_manager.plex:
+    if service_manager.plex:
         deleted_paths = []
 
         for candidate in remaining_candidates:
@@ -1829,12 +1734,12 @@ async def delete_specific_candidates(candidate_ids: list[int]) -> tuple[int, int
 
     deleted = 0
     if MediaType.MOVIE in types and (
-        service_manager.radarr or service_manager.jellyfin or service_manager.plex
+        service_manager.radarr or service_manager.plex
     ):
         deleted += await _delete_movie_candidates(restrict_to_ids=restrict)
 
     if MediaType.SERIES in types and (
-        service_manager.sonarr or service_manager.jellyfin or service_manager.plex
+        service_manager.sonarr or service_manager.plex
     ):
         deleted += await _delete_series_candidates(restrict_to_ids=restrict)
         deleted += await _delete_season_candidates(restrict_to_ids=restrict)

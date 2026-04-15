@@ -22,18 +22,16 @@ async def handle_service_toggle(
                 "api_key must be resolved before calling handle_service_toggle"
             )
 
-        if data.service_type is Service.JELLYFIN:
-            await service_manager.clear_jellyfin()
-            if data.enabled:
-                await service_manager.initialize_jellyfin(
-                    data.base_url, data.api_key, data.is_main
-                )
-        elif data.service_type is Service.PLEX:
+        if data.service_type is Service.PLEX:
             await service_manager.clear_plex()
             if data.enabled:
                 await service_manager.initialize_plex(
                     data.base_url, data.api_key, data.is_main
                 )
+        elif data.service_type is Service.TAUTULLI:
+            await service_manager.clear_tautulli()
+            if data.enabled:
+                await service_manager.initialize_tautulli(data.base_url, data.api_key)
         elif data.service_type is Service.RADARR:
             await service_manager.clear_radarr()
             if data.enabled:
