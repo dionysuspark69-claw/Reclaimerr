@@ -115,6 +115,7 @@ hiddenimports += [
     "anyio._backends._asyncio",
     "aiosqlite",
     "sqlalchemy.dialects.sqlite.aiosqlite",
+    "filelock",
 ]
 
 a = Analysis(
