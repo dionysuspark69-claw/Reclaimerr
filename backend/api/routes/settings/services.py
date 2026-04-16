@@ -300,13 +300,10 @@ async def update_service_libraries(
     _current_user: Annotated[User, Depends(require_admin)],
 ) -> dict[str, Any]:
     """Sync library selections for a given service."""
-    if not service_type.service_type or service_type.service_type not in (
-        Service.JELLYFIN,
-        Service.PLEX,
-    ):
+    if not service_type.service_type or service_type.service_type != Service.PLEX:
         raise HTTPException(
             status_code=400,
-            detail="Library selection is only supported for Jellyfin and Plex",
+            detail="Library selection is only supported for Plex",
         )
 
     # update libraries from the main server

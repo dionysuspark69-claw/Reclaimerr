@@ -5,11 +5,11 @@ import urllib3.exceptions as url3_exceptions
 
 from backend.core.logger import LOG
 from backend.enums import Service
-from backend.services.jellyfin import JellyfinService
 from backend.services.plex import PlexService
 from backend.services.radarr import RadarrClient
 from backend.services.seerr import SeerrClient
 from backend.services.sonarr import SonarrClient
+from backend.services.tautulli import TautulliService
 
 
 class ServiceManager:
@@ -21,9 +21,9 @@ class ServiceManager:
 
     def __init__(self) -> None:
         """Initialize service manager with no active clients."""
-        self._main_media_server: JellyfinService | PlexService | None = None
-        self._jellyfin: JellyfinService | None = None
+        self._main_media_server: PlexService | None = None
         self._plex: PlexService | None = None
+        self._tautulli: TautulliService | None = None
         self._radarr: RadarrClient | None = None
         self._sonarr: SonarrClient | None = None
         self._seerr: SeerrClient | None = None
@@ -31,24 +31,24 @@ class ServiceManager:
         LOG.info("ServiceManager initialized")
 
     @property
-    def main_media_server(self) -> JellyfinService | PlexService | None:
+    def main_media_server(self) -> PlexService | None:
         """Get the main media server client (must be initialized first)."""
         return self._main_media_server
 
     @main_media_server.setter
-    def main_media_server(self, service: JellyfinService | PlexService) -> None:
+    def main_media_server(self, service: PlexService) -> None:
         """Set the main media server client (must be initialized first)."""
         self._main_media_server = service
-
-    @property
-    def jellyfin(self) -> JellyfinService | None:
-        """Get Jellyfin service (must be initialized first)."""
-        return self._jellyfin
 
     @property
     def plex(self) -> PlexService | None:
         """Get Plex service (must be initialized first)."""
         return self._plex
+
+    @property
+    def tautulli(self) -> TautulliService | None:
+        """Get Tautulli service (must be initialized first)."""
+        return self._tautulli
 
     @property
     def radarr(self) -> RadarrClient | None:
@@ -68,8 +68,8 @@ class ServiceManager:
     async def get_status(self) -> dict[str, bool]:
         """Get connection status of all clients."""
         return {
-            "jellyfin": self._jellyfin is not None,
             "plex": self._plex is not None,
+            "tautulli": self._tautulli is not None,
             "radarr": self._radarr is not None,
             "sonarr": self._sonarr is not None,
             "seerr": self._seerr is not None,
@@ -78,12 +78,12 @@ class ServiceManager:
     async def test_service(
         self, service_type: Service, url: str, api_key: str
     ) -> tuple[bool, str]:
-        """Test if the specified service is initialized."""
+        """Test if the specified service is reachable with the given credentials."""
         try:
-            if service_type is Service.JELLYFIN:
-                return await JellyfinService.test_service(url, api_key), ""
-            elif service_type is Service.PLEX:
+            if service_type is Service.PLEX:
                 return await PlexService.test_service(url, api_key), ""
+            elif service_type is Service.TAUTULLI:
+                return await TautulliService.test_service(url, api_key), ""
             elif service_type is Service.RADARR:
                 return await RadarrClient.test_service(url, api_key), ""
             elif service_type is Service.SONARR:
@@ -108,43 +108,23 @@ class ServiceManager:
         except Exception as e:
             LOG.error(f"Unexpected error testing {service_type}: {e}")
             return False, "An unknown error occurred while testing the service."
+        return False, "Unknown service type."
 
     async def return_service(
         self, service_type: Service
-    ) -> (
-        JellyfinService | PlexService | RadarrClient | SonarrClient | SeerrClient | None
-    ):
+    ) -> PlexService | TautulliService | RadarrClient | SonarrClient | SeerrClient | None:
         """Return the requested service instance."""
-        if service_type is Service.JELLYFIN:
-            return self._jellyfin
-        elif service_type is Service.PLEX:
+        if service_type is Service.PLEX:
             return self._plex
+        elif service_type is Service.TAUTULLI:
+            return self._tautulli
         elif service_type is Service.RADARR:
             return self._radarr
         elif service_type is Service.SONARR:
             return self._sonarr
         elif service_type is Service.SEERR:
             return self._seerr
-
-    async def initialize_jellyfin(
-        self, base_url: str, api_key: str, is_main: bool
-    ) -> JellyfinService | None:
-        """Initialize Jellyfin service with provided config."""
-        try:
-            self._jellyfin = JellyfinService(
-                api_key=api_key,
-                jellyfin_url=base_url,
-            )
-            if not await self._jellyfin.health():
-                LOG.error(f"Jellyfin service health check failed: {base_url}")
-                raise ValueError(f"Jellyfin service health check failed: {base_url}")
-            LOG.info(f"Jellyfin service initialized: {base_url}")
-            if is_main:
-                self._main_media_server = self._jellyfin
-            return self._jellyfin
-        except Exception as e:
-            LOG.error(f"Failed to initialize Jellyfin service: {e}")
-            return None
+        return None
 
     async def initialize_plex(
         self, base_url: str, token: str, is_main: bool
@@ -164,6 +144,21 @@ class ServiceManager:
             return self._plex
         except Exception as e:
             LOG.error(f"Failed to initialize Plex service: {e}")
+            return None
+
+    async def initialize_tautulli(
+        self, base_url: str, api_key: str
+    ) -> TautulliService | None:
+        """Initialize Tautulli companion service with provided config."""
+        try:
+            self._tautulli = TautulliService(api_key=api_key, base_url=base_url)
+            if not await self._tautulli.health():
+                LOG.error(f"Tautulli service health check failed: {base_url}")
+                raise ValueError(f"Tautulli service health check failed: {base_url}")
+            LOG.info(f"Tautulli service initialized: {base_url}")
+            return self._tautulli
+        except Exception as e:
+            LOG.error(f"Failed to initialize Tautulli service: {e}")
             return None
 
     async def initialize_radarr(
@@ -218,15 +213,6 @@ class ServiceManager:
             LOG.error(f"Failed to initialize Seerr service: {e}")
             return None
 
-    async def clear_jellyfin(self) -> None:
-        """Clear Jellyfin service (call before reinitializing)."""
-        if self._main_media_server is self._jellyfin:
-            self._main_media_server = None
-        if self._jellyfin and self._jellyfin.session:
-            await self._jellyfin.session.close()
-            LOG.info("Jellyfin service cleared")
-        self._jellyfin = None
-
     async def clear_plex(self) -> None:
         """Clear Plex service (call before reinitializing)."""
         if self._main_media_server is self._plex:
@@ -235,6 +221,13 @@ class ServiceManager:
             await self._plex.session.close()
             LOG.info("Plex service cleared")
         self._plex = None
+
+    async def clear_tautulli(self) -> None:
+        """Clear Tautulli service (call before reinitializing)."""
+        if self._tautulli and self._tautulli.session:
+            await self._tautulli.session.close()
+            LOG.info("Tautulli service cleared")
+        self._tautulli = None
 
     async def clear_radarr(self) -> None:
         """Clear Radarr service (call before reinitializing)."""
@@ -260,8 +253,8 @@ class ServiceManager:
     async def clear_all(self) -> None:
         """Clear all clients (call before reinitializing from database)."""
         LOG.info("Clearing all clients")
-        await self.clear_jellyfin()
         await self.clear_plex()
+        await self.clear_tautulli()
         await self.clear_radarr()
         await self.clear_sonarr()
         await self.clear_seerr()

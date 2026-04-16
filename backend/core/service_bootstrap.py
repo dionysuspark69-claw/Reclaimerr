@@ -31,14 +31,12 @@ async def load_enabled_services() -> None:
     for config in service_configs:
         api_key = fer_decrypt(config.api_key)
 
-        if config.service_type is Service.JELLYFIN:
-            await service_manager.initialize_jellyfin(
-                config.base_url, api_key, config.is_main
-            )
-        elif config.service_type is Service.PLEX:
+        if config.service_type is Service.PLEX:
             await service_manager.initialize_plex(
                 config.base_url, api_key, config.is_main
             )
+        elif config.service_type is Service.TAUTULLI:
+            await service_manager.initialize_tautulli(config.base_url, api_key)
         elif config.service_type is Service.RADARR:
             await service_manager.initialize_radarr(config.base_url, api_key)
         elif config.service_type is Service.SONARR:

@@ -57,20 +57,6 @@
       const services = await get_api<any>("/api/settings/services");
       const libraries: LibraryType[] = [];
 
-      if (services.jellyfin?.libraries) {
-        services.jellyfin.libraries.forEach((lib: any) => {
-          libraries.push({
-            id: lib.id,
-            libraryId: lib.library_id,
-            libraryName: lib.library_name,
-            mediaType:
-              lib.media_type === "movie" ? MediaType.Movie : MediaType.Series,
-            serviceType: SettingsTab.Jellyfin,
-            selected: lib.selected,
-          });
-        });
-      }
-
       if (services.plex?.libraries) {
         services.plex.libraries.forEach((lib: any) => {
           libraries.push({

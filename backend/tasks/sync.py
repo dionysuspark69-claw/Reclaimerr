@@ -33,7 +33,6 @@ from backend.models.media import (
 )
 from backend.models.services.radarr import RadarrMovie
 from backend.models.services.sonarr import SonarrSeries
-from backend.services.jellyfin import JellyfinService
 from backend.services.notifications import notify_admins
 from backend.services.plex import PlexService
 from backend.types import MEDIA_SERVERS, MediaServerType
@@ -80,13 +79,13 @@ async def _get_main_media_server(session: AsyncSession) -> ServiceConfig | None:
 
 async def _get_media_service_instance(
     service_type: Service,
-) -> JellyfinService | PlexService | None:
-    """Return initialized media service instance for Plex/Jellyfin or None."""
+) -> PlexService | None:
+    """Return initialized Plex service instance or None."""
     service_instance = await service_manager.return_service(service_type)
     if not service_instance:
         LOG.error(f"Service {service_type} not initialized")
         return None
-    if not isinstance(service_instance, (JellyfinService, PlexService)):
+    if not isinstance(service_instance, PlexService):
         LOG.error(f"Service {service_type} is not a media server")
         return None
     return service_instance
@@ -160,19 +159,8 @@ async def _sync_seasons(
             s.last_viewed_at = sd.last_viewed_at
             s.never_watched = sd.never_watched
             if sd.service_season_id:
-                # detect whether this is plex (numeric ratingKey) or jellyfin (UUID)
-                if len(sd.service_season_id) > 20:  # jellyfin UUIDs are longer
-                    s.jellyfin_season_id = sd.service_season_id
-                else:
-                    s.plex_season_rating_key = sd.service_season_id
+                s.plex_season_rating_key = sd.service_season_id
         else:
-            jellyfin_id = None
-            plex_key = None
-            if sd.service_season_id:
-                if len(sd.service_season_id) > 20:
-                    jellyfin_id = sd.service_season_id
-                else:
-                    plex_key = sd.service_season_id
             session.add(
                 Season(
                     series_id=series_id,
@@ -182,8 +170,7 @@ async def _sync_seasons(
                     view_count=sd.view_count,
                     last_viewed_at=sd.last_viewed_at,
                     never_watched=sd.never_watched,
-                    jellyfin_season_id=jellyfin_id,
-                    plex_season_rating_key=plex_key,
+                    plex_season_rating_key=sd.service_season_id,
                 )
             )
 
@@ -902,6 +889,92 @@ async def sync_series(
         await tmdb_service.session.close()
 
 
+async def _overlay_tautulli_watch_data() -> None:
+    """Overlay Tautulli watch history on top of Plex's own view counts.
+
+    For each movie/series that Tautulli has a watch record for, take the
+    maximum view_count and the most-recent last_viewed_at between Plex's
+    stored values and Tautulli's values, then persist the winner.
+
+    Falls back silently when Tautulli is not configured.
+    """
+    if not service_manager.tautulli:
+        return
+
+    LOG.info("Overlaying Tautulli watch data...")
+    try:
+        summaries = await service_manager.tautulli.get_watch_summaries()
+    except Exception as e:
+        LOG.warning(f"Tautulli overlay failed (continuing with Plex-only data): {e}")
+        return
+
+    if not summaries:
+        LOG.debug("No Tautulli watch history available")
+        return
+
+    updated = 0
+    async with async_db() as session:
+        # --- Movies ---
+        movie_rows = await session.execute(
+            select(Movie, MovieVersion.service_item_id)
+            .join(MovieVersion, Movie.id == MovieVersion.movie_id)
+            .where(
+                MovieVersion.service == Service.PLEX,
+                Movie.removed_at.is_(None),
+            )
+        )
+        for movie, rating_key in movie_rows.all():
+            summary = summaries.get(str(rating_key))
+            if not summary:
+                continue
+            lva = summary.last_viewed_at
+            if lva is not None and lva.tzinfo is not None:
+                lva = lva.replace(tzinfo=None)
+            changed = False
+            if summary.view_count > (movie.view_count or 0):
+                movie.view_count = summary.view_count
+                movie.never_watched = False
+                changed = True
+            if lva and (not movie.last_viewed_at or lva > movie.last_viewed_at):
+                movie.last_viewed_at = lva
+                movie.never_watched = False
+                changed = True
+            if changed:
+                updated += 1
+
+        # --- Series ---
+        series_rows = await session.execute(
+            select(Series, SeriesServiceRef.service_id)
+            .join(SeriesServiceRef, Series.id == SeriesServiceRef.series_id)
+            .where(
+                SeriesServiceRef.service == Service.PLEX,
+                Series.removed_at.is_(None),
+            )
+        )
+        for series, rating_key in series_rows.all():
+            summary = summaries.get(str(rating_key))
+            if not summary:
+                continue
+            lva = summary.last_viewed_at
+            if lva is not None and lva.tzinfo is not None:
+                lva = lva.replace(tzinfo=None)
+            changed = False
+            if summary.view_count > (series.view_count or 0):
+                series.view_count = summary.view_count
+                series.never_watched = False
+                changed = True
+            if lva and (not series.last_viewed_at or lva > series.last_viewed_at):
+                series.last_viewed_at = lva
+                series.never_watched = False
+                changed = True
+            if changed:
+                updated += 1
+
+        await session.commit()
+
+    LOG.info(f"Tautulli overlay updated watch data for {updated} item(s)")
+
+
 async def sync_media() -> dict[str, Any] | None:
     """
     Main sync tasks task.
@@ -936,13 +1009,8 @@ async def sync_media() -> dict[str, Any] | None:
         # sync series
         await sync_series(main_server)  # type: ignore[reportArgumentType]
 
-        # sync linked watch data from any non-main servers
-        async with async_db() as linked_session:
-            all_servers = await _get_configured_media_servers(linked_session)
-        for svr in all_servers:
-            if svr.service_type != main_server and svr.service_type in MEDIA_SERVERS:
-                LOG.debug(f"Linked watch sync from {svr.service_type}")
-                await sync_linked_data(svr.service_type)  # type: ignore[reportArgumentType]
+        # overlay Tautulli watch data on top of Plex data (if configured)
+        await _overlay_tautulli_watch_data()
 
         return {"library_sync": library_sync_result}
 
@@ -1036,6 +1104,7 @@ async def resync_media() -> None:
                 await session.commit()
             LOG.info("Cleared all MovieVersion rows for main server resync")
             await sync_movies(allow_soft_delete=False)
+            await _overlay_tautulli_watch_data()
         except Exception as e:
             LOG.error(f"Error during main server resync: {e}", exc_info=True)
             raise

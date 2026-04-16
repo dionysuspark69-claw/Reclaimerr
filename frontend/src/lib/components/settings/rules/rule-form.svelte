@@ -15,7 +15,6 @@
   import X from "@lucide/svelte/icons/x";
   import Info from "@lucide/svelte/icons/info";
   import * as Tooltip from "$lib/components/ui/tooltip/index.js";
-  import JellyfinSVG from "$lib/components/svgs/JellyfinSVG.svelte";
   import PlexSVG from "$lib/components/svgs/PlexSVG.svelte";
   import { toast } from "svelte-sonner";
 
@@ -286,9 +285,7 @@
                     />
                     <div class="flex items-center space-x-1.5">
                       <div class="w-4 h-4 shrink-0">
-                        {#if library.serviceType === SettingsTab.Jellyfin}
-                          <JellyfinSVG />
-                        {:else if library.serviceType === SettingsTab.Plex}
+                        {#if library.serviceType === SettingsTab.Plex}
                           <PlexSVG />
                         {/if}
                       </div>

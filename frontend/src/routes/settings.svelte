@@ -23,6 +23,7 @@
   import RadarrSVG from "$lib/components/svgs/RadarrSVG.svelte";
   import SonarrSVG from "$lib/components/svgs/SonarrSVG.svelte";
   import SeerrSVG from "$lib/components/svgs/SeerrSVG.svelte";
+  import TautulliSVG from "$lib/components/svgs/TautulliSVG.svelte";
   import BookAlert from "@lucide/svelte/icons/book-alert";
   import UserCog from "@lucide/svelte/icons/user-cog";
   import Filter from "@lucide/svelte/icons/filter";
@@ -56,11 +57,12 @@
     apiKeyIsSet: boolean;
   };
 
-  // non-media-server service tabs (jellyfin/plex managed by MediaServers component)
+  // non-media-server service tabs (plex managed by MediaServers component)
   const serviceTabs = [
     SettingsTab.Radarr,
     SettingsTab.Sonarr,
     SettingsTab.Seerr,
+    SettingsTab.Tautulli,
   ];
 
   // organize tabs into groups
@@ -94,6 +96,13 @@
           label: "Seerr",
           icon: SeerrSVG,
           baseUrlPlaceholder: "e.g. http://localhost:5055",
+          adminOnly: true,
+        },
+        {
+          id: SettingsTab.Tautulli,
+          label: "Tautulli",
+          icon: TautulliSVG,
+          baseUrlPlaceholder: "e.g. http://localhost:8181",
           adminOnly: true,
         },
       ],
@@ -187,6 +196,7 @@
     [SettingsTab.Radarr]: emptyServiceState(),
     [SettingsTab.Sonarr]: emptyServiceState(),
     [SettingsTab.Seerr]: emptyServiceState(),
+    [SettingsTab.Tautulli]: emptyServiceState(),
   });
 
   // handler for service config changes (radarr/sonarr/seerr only)

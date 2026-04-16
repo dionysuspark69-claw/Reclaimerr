@@ -112,7 +112,7 @@ class NotificationSetting(Base):
 
 class ServiceConfig(Base):
     """
-    Configuration for external services (Plex, Jellyfin, Radarr, Sonarr, Seerr).
+    Configuration for external services (Plex, Tautulli, Radarr, Sonarr, Seerr).
     """
 
     __tablename__ = "service_configs"
@@ -274,9 +274,9 @@ class MovieVersion(Base):
 
     # service identification
     service: Mapped[Service] = mapped_column(Enum(Service))
-    # plex ratingKey or jellyfin item ID (used for item-level ops like delete)
+    # plex ratingKey (used for item-level ops like delete)
     service_item_id: Mapped[str] = mapped_column(String(100))
-    # plex Media.id or jellyfin MediaSource.Id (unique per physical file)
+    # plex Media.id (unique per physical file)
     service_media_id: Mapped[str] = mapped_column(String(100))
 
     # library
@@ -314,7 +314,7 @@ class SeriesServiceRef(Base):
 
     # service identification
     service: Mapped[Service] = mapped_column(Enum(Service))
-    # plex ratingKey or jellyfin item ID (used for item-level ops like delete)
+    # plex ratingKey (used for item-level ops like delete)
     service_id: Mapped[str] = mapped_column(String(100))
 
     # library
@@ -447,7 +447,6 @@ class Season(Base):
     air_date: Mapped[datetime | None] = mapped_column(DateTime, default=None)
 
     # service-specific IDs for direct ops
-    jellyfin_season_id: Mapped[str | None] = mapped_column(String(100), default=None)
     plex_season_rating_key: Mapped[str | None] = mapped_column(
         String(100), default=None
     )

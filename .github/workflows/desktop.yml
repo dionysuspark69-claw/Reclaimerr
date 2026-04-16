@@ -62,6 +62,16 @@ jobs:
       - name: Build desktop app
         run: uv run python scripts/build_desktop.py
 
+      - name: Build installer (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = "${{ github.event.inputs.tag || github.ref_name }}"
+          if (-not $version -or $version -eq '') { $version = "0.0.0" }
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc /DMyAppVersion="$version" installer\reclaimerr.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Archive build (Windows)
         if: runner.os == 'Windows'
         run: Compress-Archive -Path "${{ matrix.exe_path }}/*" -DestinationPath "${{ matrix.artifact_name }}"
@@ -76,6 +86,14 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_name }}
+          retention-days: 7
+
+      - name: Upload installer artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reclaimerr-windows-setup.exe
+          path: installer-output/Reclaimerr-Setup.exe
           retention-days: 7
 
   release:

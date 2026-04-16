@@ -4,9 +4,9 @@
 class Service(StrEnum):
     SONARR = auto()
     RADARR = auto()
-    JELLYFIN = auto()
     PLEX = auto()
     SEERR = auto()
+    TAUTULLI = auto()
 
 
 class MediaType(StrEnum):

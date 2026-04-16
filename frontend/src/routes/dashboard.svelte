@@ -133,9 +133,9 @@
   };
 
   // determine if we should show last sync info for a service
-  // (only for Plex and Jellyfin for now since those are the only ones with sync functionality)
+  // (only for Plex since it is the media server with sync functionality)
   const shouldShowServiceSync = (serviceName: string) =>
-    serviceName === "plex" || serviceName === "jellyfin";
+    serviceName === "plex";
 
   // fetch dashboard stats from API
   const fetchStats = async (showLoading = true) => {

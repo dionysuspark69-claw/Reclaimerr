@@ -4,7 +4,6 @@
   import ServiceConfigForm from "$lib/components/settings/service-config-form.svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import Spinner from "$lib/components/ui/spinner/spinner.svelte";
-  import JellyfinSVG from "$lib/components/svgs/JellyfinSVG.svelte";
   import PlexSVG from "$lib/components/svgs/PlexSVG.svelte";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import TestButton from "$lib/components/test-button.svelte";
@@ -63,17 +62,14 @@
   };
 
   const SERVER_ICONS: Record<ServerKey, any> = {
-    jellyfin: JellyfinSVG,
     plex: PlexSVG,
   };
 
   const SERVER_LABELS: Record<ServerKey, string> = {
-    jellyfin: "Jellyfin",
     plex: "Plex",
   };
 
   const SERVER_URL_PLACEHOLDERS: Record<ServerKey, string> = {
-    jellyfin: "e.g. http://localhost:8096",
     plex: "e.g. http://localhost:32400",
   };
 
@@ -85,7 +81,6 @@
   });
 
   let servers = $state<Record<ServerKey, MediaServerState>>({
-    jellyfin: emptyState(),
     plex: emptyState(),
   });
 
@@ -193,11 +188,7 @@
       if (response.data.is_main) {
         savedMainServer = serverKey;
         pendingMain = serverKey;
-        for (const key of SERVERS) {
-          if (key !== serverKey) {
-            servers[key].config.isMain = false;
-          }
-        }
+        servers[serverKey].config.isMain = true;
       }
       toast.success(response.message);
       return response.sync_action ?? null;
@@ -213,7 +204,6 @@
 
   // track original config for change detection
   let originalConfigs = $state<Record<ServerKey, MediaServerConfig>>({
-    jellyfin: { enabled: false, baseUrl: "", apiKey: "", isMain: false },
     plex: { enabled: false, baseUrl: "", apiKey: "", isMain: false },
   });
 
@@ -414,21 +404,12 @@
             value={pendingMain ?? undefined}
             onValueChange={(value) => {
               const newMain = value as ServerKey;
-              const oldMain = pendingMain;
-
-              if (oldMain && oldMain !== newMain) {
-                // restore the demoted server's enabled state from before it was promoted
-                servers[oldMain].config.enabled =
-                  enabledBeforePromotion[oldMain] ?? false;
-              }
 
               // save the incoming server's enabled state before forcing it on
               enabledBeforePromotion[newMain] = servers[newMain].config.enabled;
 
               pendingMain = newMain;
-              for (const key of SERVERS) {
-                servers[key].config.isMain = key === newMain;
-              }
+              servers[newMain].config.isMain = true;
               // main server must always be enabled
               servers[newMain].config.enabled = true;
             }}
