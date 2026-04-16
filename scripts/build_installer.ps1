@@ -64,14 +64,46 @@ if (-not $nodeCmd) {
     }
 }
 
-$frontendDist = Join-Path $RepoRoot "frontend\dist"
 if (-not $nodeCmd) {
-    if (Test-Path $frontendDist) {
-        Write-Warning "node not found — skipping frontend build (using existing frontend\dist)."
+    Write-Host "[INFO] Node.js not found — attempting automatic install..." -ForegroundColor Yellow
+
+    # Try winget first (available on Windows 10 1709+ / Windows 11)
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    if ($winget) {
+        Write-Host "[INFO] Installing Node.js LTS via winget..."
+        winget install OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements
+        # Refresh PATH from registry so node is visible immediately
+        $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" +
+                    [System.Environment]::GetEnvironmentVariable("PATH","User")
     } else {
-        Die "node not found and frontend\dist does not exist.`nInstall Node 20+ from https://nodejs.org/ then re-run."
+        # Fallback: download the MSI for the latest Node LTS directly
+        Write-Host "[INFO] winget not available — downloading Node.js LTS MSI..."
+        try {
+            $index   = Invoke-RestMethod "https://nodejs.org/dist/index.json"
+            $lts     = $index | Where-Object { $_.lts -ne $false } | Select-Object -First 1
+            $ver     = $lts.version          # e.g. "v22.13.1"
+            $msiUrl  = "https://nodejs.org/dist/$ver/node-$ver-x64.msi"
+            $msiPath = "$env:TEMP\node-lts-installer.msi"
+            Write-Host "[INFO] Downloading $msiUrl ..."
+            Invoke-WebRequest -Uri $msiUrl -OutFile $msiPath -UseBasicParsing
+            Write-Host "[INFO] Running installer (this may take a minute)..."
+            Start-Process msiexec.exe -ArgumentList "/i `"$msiPath`" /quiet /norestart ADDLOCAL=ALL" -Wait
+            Remove-Item $msiPath -Force -ErrorAction SilentlyContinue
+            $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" +
+                        [System.Environment]::GetEnvironmentVariable("PATH","User")
+        } catch {
+            Die "Automatic Node.js install failed: $_`nInstall Node 20+ manually from https://nodejs.org/ then re-run."
+        }
     }
-} else {
+
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+    if (-not $nodeCmd) {
+        Die "Node.js was installed but 'node' is still not on PATH.`nOpen a new terminal and re-run this script."
+    }
+    Write-Host "[INFO] Node.js $(node --version) ready." -ForegroundColor Green
+}
+
+if ($nodeCmd) {
     Push-Location (Join-Path $RepoRoot "frontend")
     npm install
     if ($LASTEXITCODE -ne 0) { Die "npm install failed" }
