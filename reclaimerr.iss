@@ -1,7 +1,6 @@
 ; Reclaimerr Inno Setup installer script
-; Auto-run after the PyInstaller build step in CI.
-; Pass the version on the command line:
-;   ISCC.exe /DMyAppVersion="0.1.0" installer\reclaimerr.iss
+; Run from the repo root:
+;   ISCC.exe /DMyAppVersion="0.1.0" reclaimerr.iss
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0"
@@ -25,9 +24,9 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=commandline
 
 ; Output
-OutputDir=..\installer-output
+OutputDir=installer-output
 OutputBaseFilename=Reclaimerr-Setup
-SetupIconFile=..\frontend\static\favicon.ico
+SetupIconFile=frontend\static\favicon.ico
 UninstallDisplayIcon={app}\{#MyAppExe}
 
 ; Compression
@@ -53,7 +52,7 @@ Name: "autostart";   Description: "Start {#MyAppName} &automatically when Window
 
 [Files]
 ; Entire PyInstaller onedir bundle
-Source: "..\dist\reclaimerr\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\reclaimerr\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 ; Start Menu
