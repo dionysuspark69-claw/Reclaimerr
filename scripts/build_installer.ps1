@@ -45,15 +45,40 @@ function Die($msg)  { Write-Host "`nERROR: $msg" -ForegroundColor Red; exit 1 }
 # Step 1 — Frontend
 # ---------------------------------------------------------------------------
 Step "Building frontend SPA"
-$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
-if (-not $nodeCmd) { Die "node is not on PATH. Install Node 20+ from https://nodejs.org/" }
 
-Push-Location (Join-Path $RepoRoot "frontend")
-npm install
-if ($LASTEXITCODE -ne 0) { Die "npm install failed" }
-npm run build
-if ($LASTEXITCODE -ne 0) { Die "npm run build failed" }
-Pop-Location
+# Find node — check PATH first, then common Windows install locations
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if (-not $nodeCmd) {
+    $candidates = @(
+        "C:\Program Files\nodejs\node.exe",
+        "C:\Program Files (x86)\nodejs\node.exe",
+        "$env:LOCALAPPDATA\Programs\nodejs\node.exe",
+        "$env:LOCALAPPDATA\nvm\current\node.exe"
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path $c) {
+            $env:PATH = (Split-Path $c) + ";" + $env:PATH
+            $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+            break
+        }
+    }
+}
+
+$frontendDist = Join-Path $RepoRoot "frontend\dist"
+if (-not $nodeCmd) {
+    if (Test-Path $frontendDist) {
+        Write-Warning "node not found — skipping frontend build (using existing frontend\dist)."
+    } else {
+        Die "node not found and frontend\dist does not exist.`nInstall Node 20+ from https://nodejs.org/ then re-run."
+    }
+} else {
+    Push-Location (Join-Path $RepoRoot "frontend")
+    npm install
+    if ($LASTEXITCODE -ne 0) { Die "npm install failed" }
+    npm run build
+    if ($LASTEXITCODE -ne 0) { Die "npm run build failed" }
+    Pop-Location
+}
 
 # ---------------------------------------------------------------------------
 # Step 2 — PyInstaller desktop bundle
