@@ -89,9 +89,12 @@ hiddenimports = []
 # collect_all() returns (datas, binaries, hiddenimports) tuples.
 # ------------------------------------------------------------------
 for pkg in (
-    "backend",   # our app - entry point is a string in uvicorn.Config
-    "desktop",   # tray / server helpers
-    "uvicorn",   # ships non-.py data files
+    "backend",    # our app - entry point is a string in uvicorn.Config
+    "desktop",    # tray / server helpers
+    "uvicorn",    # ships non-.py data files
+    "filelock",   # used by desktop/__main__.py; missed by static analysis
+    "pystray",    # tray icon - loaded at runtime
+    "platformdirs",
 ):
     d, b, h = collect_all(pkg)
     datas    += d

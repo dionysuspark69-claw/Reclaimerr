@@ -119,7 +119,9 @@ if ($uvCmd) {
     if ($LASTEXITCODE -ne 0) { Die "PyInstaller build failed" }
 } else {
     $pyCmd = if (Get-Command py -ErrorAction SilentlyContinue) { "py" } else { "python" }
-    & $pyCmd -m pip install pyinstaller --quiet
+    Write-Host "[INFO] Installing desktop dependencies via pip..."
+    & $pyCmd -m pip install -e ".[desktop]" --quiet
+    if ($LASTEXITCODE -ne 0) { Die "pip install failed" }
     & $pyCmd scripts/build_desktop.py
     if ($LASTEXITCODE -ne 0) { Die "PyInstaller build failed" }
 }
