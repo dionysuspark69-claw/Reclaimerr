@@ -40,6 +40,11 @@ Push-Location $RepoRoot
 
 function Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Die($msg)  { Write-Host "`nERROR: $msg" -ForegroundColor Red; exit 1 }
+function RefreshPath {
+    $m = [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
+    $u = [System.Environment]::GetEnvironmentVariable("PATH", "User")
+    $env:PATH = $m + ";" + $u
+}
 
 # ---------------------------------------------------------------------------
 # Step 1 — Frontend
@@ -73,8 +78,7 @@ if (-not $nodeCmd) {
         Write-Host "[INFO] Installing Node.js LTS via winget..."
         winget install OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements
         # Refresh PATH from registry so node is visible immediately
-        $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" +
-                    [System.Environment]::GetEnvironmentVariable("PATH","User")
+        RefreshPath
     } else {
         # Fallback: download the MSI for the latest Node LTS directly
         Write-Host "[INFO] winget not available — downloading Node.js LTS MSI..."
@@ -89,8 +93,7 @@ if (-not $nodeCmd) {
             Write-Host "[INFO] Running installer (this may take a minute)..."
             Start-Process msiexec.exe -ArgumentList "/i `"$msiPath`" /quiet /norestart ADDLOCAL=ALL" -Wait
             Remove-Item $msiPath -Force -ErrorAction SilentlyContinue
-            $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" +
-                        [System.Environment]::GetEnvironmentVariable("PATH","User")
+            RefreshPath
         } catch {
             Die "Automatic Node.js install failed: $_`nInstall Node 20+ manually from https://nodejs.org/ then re-run."
         }
