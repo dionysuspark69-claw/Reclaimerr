@@ -14,6 +14,8 @@
   import Ticket from "@lucide/svelte/icons/ticket";
   import Shield from "@lucide/svelte/icons/shield";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
+  import Sparkles from "@lucide/svelte/icons/sparkles";
+  import Copy from "@lucide/svelte/icons/copy";
   import { toTitleCase } from "$lib/utils/strings";
   import * as Avatar from "$lib/components/ui/avatar/index.js";
   import * as Tooltip from "$lib/components/ui/tooltip/index.js";
@@ -61,12 +63,26 @@
         "View and manage protected media that won't be automatically deleted",
     },
     {
+      path: "/reclaim",
+      label: "Reclaim",
+      icon: Sparkles,
+      adminOnly: false,
+      tooltip: "Free up disk space - candidates and duplicates in one place",
+    },
+    {
       path: "/candidates",
       label: "Candidates",
       icon: TriangleAlert,
       adminOnly: false,
       tooltip:
         "Review media that are candidates for deletion based on your retention settings",
+    },
+    {
+      path: "/duplicates",
+      label: "Duplicates",
+      icon: Copy,
+      adminOnly: false,
+      tooltip: "Same title across multiple libraries or with multiple file versions",
     },
     {
       path: "/settings",

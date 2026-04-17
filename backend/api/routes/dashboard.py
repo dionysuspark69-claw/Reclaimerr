@@ -12,6 +12,7 @@ from backend.core.utils.datetime_utils import to_utc_isoformat
 from backend.core.utils.file_utils import bytes_to_gb
 from backend.database import get_db
 from backend.database.models import (
+    GeneralSettings,
     Movie,
     ProtectedMedia,
     ProtectionRequest,
@@ -337,6 +338,13 @@ async def get_dashboard(
         can_view_admin_panels=is_admin,
     )
 
+    # safe_mode flag is needed client-side by every user (not just admins) so
+    # the delete flows know whether to wrap in an undo countdown.
+    gs_row = (
+        await db.execute(select(GeneralSettings.safe_mode_enabled))
+    ).scalar_one_or_none()
+    safe_mode_enabled = True if gs_row is None else bool(gs_row)
+
     return DashboardResponse(
         kpis=kpis,
         requests=request_summary,
@@ -344,4 +352,5 @@ async def get_dashboard(
         activity=activity,
         viewer=viewer,
         media_server_configured=media_server_configured,
+        safe_mode_enabled=safe_mode_enabled,
     )

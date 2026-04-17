@@ -1,7 +1,6 @@
 ; Reclaimerr Inno Setup installer script
-; Auto-run after the PyInstaller build step in CI.
-; Pass the version on the command line:
-;   ISCC.exe /DMyAppVersion="0.1.0" installer\reclaimerr.iss
+; Run from the repo root:
+;   ISCC.exe /DMyAppVersion="0.1.0" reclaimerr.iss
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0"

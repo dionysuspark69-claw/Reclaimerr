@@ -20,6 +20,7 @@
   import CalendarClock from "@lucide/svelte/icons/calendar-clock";
   import Boxes from "@lucide/svelte/icons/boxes";
   import Server from "@lucide/svelte/icons/server";
+  import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
   import RadarrSVG from "$lib/components/svgs/RadarrSVG.svelte";
   import SonarrSVG from "$lib/components/svgs/SonarrSVG.svelte";
   import SeerrSVG from "$lib/components/svgs/SeerrSVG.svelte";
@@ -63,6 +64,7 @@
     SettingsTab.Sonarr,
     SettingsTab.Seerr,
     SettingsTab.Tautulli,
+    SettingsTab.Tdarr,
   ];
 
   // organize tabs into groups
@@ -103,6 +105,13 @@
           label: "Tautulli",
           icon: TautulliSVG,
           baseUrlPlaceholder: "e.g. http://localhost:8181",
+          adminOnly: true,
+        },
+        {
+          id: SettingsTab.Tdarr,
+          label: "Tdarr",
+          icon: HardDriveDownload,
+          baseUrlPlaceholder: "e.g. http://localhost:8265",
           adminOnly: true,
         },
       ],
@@ -197,6 +206,7 @@
     [SettingsTab.Sonarr]: emptyServiceState(),
     [SettingsTab.Seerr]: emptyServiceState(),
     [SettingsTab.Tautulli]: emptyServiceState(),
+    [SettingsTab.Tdarr]: emptyServiceState(),
   });
 
   // handler for service config changes (radarr/sonarr/seerr only)

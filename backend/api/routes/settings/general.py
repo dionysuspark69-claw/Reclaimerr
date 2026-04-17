@@ -4,15 +4,50 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from backend.core.auth import require_admin
 from backend.database import get_db
-from backend.database.models import GeneralSettings, User
+from backend.database.models import GeneralSettings, ServiceMediaLibrary, User
+from backend.enums import MediaType
 from backend.models.settings import GeneralSettingsResponse
 
 router = APIRouter(tags=["settings", "general"])
+
+
+class LibraryOption(BaseModel):
+    library_id: str
+    library_name: str
+    media_type: str
+
+
+@router.get("/libraries")
+async def list_libraries_for_settings(
+    _admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> list[LibraryOption]:
+    """Return movie libraries available for the preferred-library picker."""
+    rows = (
+        await db.execute(
+            select(
+                ServiceMediaLibrary.library_id,
+                ServiceMediaLibrary.library_name,
+                ServiceMediaLibrary.media_type,
+            )
+            .where(ServiceMediaLibrary.media_type == MediaType.MOVIE)
+            .order_by(ServiceMediaLibrary.library_name)
+        )
+    ).all()
+    return [
+        LibraryOption(
+            library_id=r.library_id,
+            library_name=r.library_name,
+            media_type=r.media_type.value,
+        )
+        for r in rows
+    ]
 
 
 @router.get("/general")
@@ -55,6 +90,8 @@ async def update_general_settings(
     settings.cleanup_tag_suffix = request.cleanup_tag_suffix
     settings.worker_poll_min_seconds = request.worker_poll_min_seconds
     settings.worker_poll_max_seconds = request.worker_poll_max_seconds
+    settings.safe_mode_enabled = request.safe_mode_enabled
+    settings.preferred_library_id = request.preferred_library_id
 
     # update metadata
     settings.updated_at = datetime.now(timezone.utc)

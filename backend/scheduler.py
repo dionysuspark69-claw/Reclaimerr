@@ -78,6 +78,24 @@ DEFAULT_SCHEDULES = (
         "enabled": True,
     },
     {
+        "task": Task.FIND_DUPLICATES,
+        "description": "Scans the library for duplicate movies and series across libraries and file versions",
+        "schedule_type": ScheduleType.CRON,
+        "schedule_value": "30 10 * * *",  # daily at 10:30 AM
+        "default_schedule_type": ScheduleType.CRON,
+        "default_schedule_value": "30 10 * * *",
+        "enabled": True,
+    },
+    {
+        "task": Task.SCAN_TDARR_FLAGGED,
+        "description": "Pulls files Tdarr has flagged for transcode and surfaces them as reclaim candidates",
+        "schedule_type": ScheduleType.CRON,
+        "schedule_value": "45 10 * * *",  # daily at 10:45 AM
+        "default_schedule_type": ScheduleType.CRON,
+        "default_schedule_value": "45 10 * * *",
+        "enabled": True,
+    },
+    {
         "task": Task.WEEKLY_HOUSE_KEEPING,
         "description": "Performs weekly maintenance tasks to ensure system stability",
         "schedule_type": ScheduleType.CRON,

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.auth import require_admin
+from backend.core.auth import get_current_user, require_admin
 from backend.core.utils.datetime_utils import to_utc_isoformat
 from backend.database import get_db
 from backend.database.models import BackgroundJob, User
@@ -98,3 +98,35 @@ async def get_background_job(
         )
 
     return _serialize_background_job(job)
+
+
+@router.get("/background-jobs/{job_id}/status")
+async def get_background_job_status(
+    job_id: int,
+    _user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Lightweight status-only view of a background job.
+
+    Available to any authenticated user so that callers (e.g. MANAGE_RECLAIM
+    users polling a scan they just triggered) can track completion without
+    leaking payloads, timestamps, or worker identity.
+    """
+    result = await db.execute(
+        select(
+            BackgroundJob.id,
+            BackgroundJob.status,
+            BackgroundJob.error_message,
+        ).where(BackgroundJob.id == job_id)
+    )
+    row = result.one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=404, detail=f"Background job '{job_id}' not found"
+        )
+
+    return {
+        "id": row.id,
+        "status": row.status,
+        "error_message": row.error_message,
+    }

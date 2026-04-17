@@ -170,6 +170,14 @@ class GeneralSettings(Base):
     worker_poll_min_seconds: Mapped[float | None] = mapped_column(Float, default=None)
     worker_poll_max_seconds: Mapped[float | None] = mapped_column(Float, default=None)
 
+    # safe mode: wraps deletes with an undo countdown on the client
+    safe_mode_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # when choosing which copy of a duplicate to keep, prefer this library
+    preferred_library_id: Mapped[str | None] = mapped_column(
+        String(50), default=None
+    )
+
     # timestamps
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), init=False
@@ -563,6 +571,115 @@ class ReclaimCandidate(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), init=False
+    )
+
+
+class DuplicateGroup(Base):
+    """A group of duplicate media files (same title across libraries/versions)."""
+
+    __tablename__ = "duplicate_groups"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, init=False, autoincrement=True
+    )
+
+    # what kind of media this group is about
+    media_type: Mapped[MediaType] = mapped_column(Enum(MediaType))
+
+    # foreign keys (movie_id or series_id will be set based on media_type)
+    movie_id: Mapped[int | None] = mapped_column(
+        ForeignKey("movies.id", ondelete="CASCADE"), default=None, index=True
+    )
+    series_id: Mapped[int | None] = mapped_column(
+        ForeignKey("series.id", ondelete="CASCADE"), default=None, index=True
+    )
+
+    # snapshot for display
+    title: Mapped[str | None] = mapped_column(String(512), default=None)
+    year: Mapped[int | None] = mapped_column(SmallInteger, default=None)
+
+    # detection metadata
+    # "cross_library" = same item in multiple libraries/services
+    # "multi_version" = same item with multiple file versions in one library
+    # "mixed" = both
+    detection_kind: Mapped[str] = mapped_column(String(20), default="mixed")
+
+    # total copies and size (denormalized for sort/filter)
+    candidate_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_size: Mapped[int] = mapped_column(Integer, default=0)
+    # reclaimable bytes if all non-keep copies are removed
+    reclaimable_size: Mapped[int] = mapped_column(Integer, default=0)
+
+    # workflow
+    resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), init=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), init=False
+    )
+
+    # relationships
+    candidates: Mapped[list[DuplicateCandidate]] = relationship(
+        back_populates="group",
+        default_factory=list,
+        lazy="noload",
+        repr=False,
+        cascade="all, delete-orphan",
+    )
+
+
+class DuplicateCandidate(Base):
+    """One file version that is part of a DuplicateGroup."""
+
+    __tablename__ = "duplicate_candidates"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, init=False, autoincrement=True
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("duplicate_groups.id", ondelete="CASCADE"), index=True
+    )
+
+    # link to underlying version row (optional — may be a series-level ref)
+    movie_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("movie_versions.id", ondelete="CASCADE"),
+        default=None,
+        index=True,
+    )
+    series_service_ref_id: Mapped[int | None] = mapped_column(
+        ForeignKey("series_service_refs.id", ondelete="CASCADE"),
+        default=None,
+        index=True,
+    )
+
+    # display/snapshot fields so the UI doesn't need N joins
+    service: Mapped[Service] = mapped_column(Enum(Service), default=Service.PLEX)
+    library_id: Mapped[str | None] = mapped_column(String(100), default=None)
+    library_name: Mapped[str | None] = mapped_column(String(255), default=None)
+    path: Mapped[str | None] = mapped_column(String(1024), default=None)
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    container: Mapped[str | None] = mapped_column(String(20), default=None)
+    resolution: Mapped[str | None] = mapped_column(String(20), default=None)
+
+    # scoring for keep/discard recommendation (higher = better copy)
+    score: Mapped[float] = mapped_column(Float, default=0.0)
+    # whether this is the suggested-to-keep copy
+    keep: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), init=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), init=False
+    )
+
+    # relationships
+    group: Mapped[DuplicateGroup] = relationship(
+        back_populates="candidates", init=False, lazy="noload", repr=False
     )
 
 

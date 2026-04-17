@@ -58,6 +58,10 @@ class Task(StrEnum):
     TAG_CLEANUP_CANDIDATES = auto()
     DELETE_CLEANUP_CANDIDATES = auto()
 
+    # duplicates and tdarr
+    FIND_DUPLICATES = auto()
+    SCAN_TDARR_FLAGGED = auto()
+
     # housekeeping
     WEEKLY_HOUSE_KEEPING = auto()
 

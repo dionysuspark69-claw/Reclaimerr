@@ -69,7 +69,7 @@ jobs:
           $version = "${{ github.event.inputs.tag || github.ref_name }}"
           if (-not $version -or $version -eq '') { $version = "0.0.0" }
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          & $iscc /DMyAppVersion="$version" installer\reclaimerr.iss
+          & $iscc /DMyAppVersion="$version" reclaimerr.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Archive build (Windows)

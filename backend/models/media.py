@@ -292,3 +292,57 @@ class DeleteCandidatesRequest(BaseModel):
 class DeleteCandidatesResponse(BaseModel):
     deleted: int
     failed: int
+
+
+class DuplicateCandidateEntry(BaseModel):
+    """One file version that is part of a DuplicateGroup."""
+
+    id: int
+    service: str
+    library_id: str | None
+    library_name: str | None
+    path: str | None
+    size: int
+    container: str | None
+    resolution: str | None
+    score: float
+    keep: bool
+
+
+class DuplicateGroupEntry(BaseModel):
+    """A duplicate group with its candidate copies inlined."""
+
+    id: int
+    media_type: str
+    media_id: int | None
+    title: str | None
+    year: int | None
+    poster_url: str | None
+    detection_kind: str
+    candidate_count: int
+    total_size: int
+    reclaimable_size: int
+    resolved: bool
+    created_at: str
+    candidates: list[DuplicateCandidateEntry]
+
+
+class PaginatedDuplicatesResponse(BaseModel):
+    items: list[DuplicateGroupEntry]
+    total: int
+    page: int
+    per_page: int
+    total_pages: int
+    total_reclaimable_bytes: int
+
+
+class ResolveDuplicatesRequest(BaseModel):
+    """Resolve duplicate groups by deleting the non-keep candidates."""
+
+    group_ids: list[int]
+
+
+class ResolveDuplicatesResponse(BaseModel):
+    deleted: int
+    failed: int
+    groups_resolved: int
