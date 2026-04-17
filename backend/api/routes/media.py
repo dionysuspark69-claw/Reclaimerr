@@ -700,6 +700,58 @@ async def scan_duplicates_route(
     }
 
 
+@router.post("/scan-everything")
+async def scan_everything_route(
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    """Enqueue every reclaim scan at once (rules, duplicates, Tdarr).
+
+    Tdarr is skipped when the service isn't configured. Returns a per-task
+    map so the UI can poll each job and report combined progress.
+    """
+    if not (
+        user.role is UserRole.ADMIN or has_permission(user, Permission.MANAGE_RECLAIM)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Manage reclaim permission required",
+        )
+
+    from backend.core.task_runtime import request_task_run
+    from backend.database.models import ServiceConfig
+    from backend.enums import Service
+
+    tasks_to_run: list[Task] = [
+        Task.SCAN_CLEANUP_CANDIDATES,
+        Task.FIND_DUPLICATES,
+    ]
+
+    # Only enqueue Tdarr scan when Tdarr is actually configured and enabled.
+    tdarr_enabled = (
+        await db.execute(
+            select(ServiceConfig.enabled).where(
+                ServiceConfig.service_type == Service.TDARR
+            )
+        )
+    ).scalar_one_or_none()
+    if tdarr_enabled:
+        tasks_to_run.append(Task.SCAN_TDARR_FLAGGED)
+
+    jobs: dict[str, dict[str, object]] = {}
+    for task in tasks_to_run:
+        job, queued = await request_task_run(task)
+        jobs[task.value] = {
+            "queued": queued,
+            "job_id": job.id if job is not None else None,
+        }
+
+    return {
+        "jobs": jobs,
+        "tdarr_configured": bool(tdarr_enabled),
+    }
+
+
 @router.get("/duplicates", response_model=PaginatedDuplicatesResponse)
 async def get_duplicates(
     _user: Annotated[User, Depends(get_current_user)],
