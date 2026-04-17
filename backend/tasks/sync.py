@@ -1065,6 +1065,16 @@ async def sync_media() -> dict[str, Any] | None:
         await _overlay_plex_global_history()
         await _overlay_tautulli_watch_data()
 
+        # Re-evaluate cleanup rules so candidates created from stale watch data
+        # (e.g. before a Plex/Tautulli overlay corrected view_count) are pruned
+        # immediately rather than persisting until the next standalone scan.
+        from backend.tasks.cleanup import scan_cleanup_candidates
+
+        try:
+            await scan_cleanup_candidates()
+        except Exception as e:
+            LOG.error(f"Post-sync candidate rescan failed: {e}", exc_info=True)
+
         return {"library_sync": library_sync_result}
 
 
