@@ -17,6 +17,7 @@ from backend.database.models import (
     ProtectedMedia,
     ProtectionRequest,
     ReclaimCandidate,
+    Season,
     Series,
     ServiceConfig,
     TaskRun,
@@ -64,18 +65,62 @@ async def get_dashboard(
                 .select_from(Series)
                 .scalar_subquery()
                 .label("series_count"),
+                # reclaimable movie bytes: sum Movie.size ONCE per distinct movie
+                # that has a candidate (avoids double-counting when a movie is
+                # matched by multiple rules or both a rule and Tdarr).
                 select(func.coalesce(func.sum(Movie.size), 0))
-                .select_from(ReclaimCandidate)
-                .join(Movie, ReclaimCandidate.movie_id == Movie.id)
-                .where(ReclaimCandidate.media_type == MediaType.MOVIE)
+                .select_from(Movie)
+                .where(
+                    Movie.id.in_(
+                        select(ReclaimCandidate.movie_id)
+                        .where(
+                            ReclaimCandidate.media_type == MediaType.MOVIE,
+                            ReclaimCandidate.movie_id.is_not(None),
+                        )
+                        .distinct()
+                    )
+                )
                 .scalar_subquery()
                 .label("movie_size_total"),
+                # reclaimable series bytes at series-level: sum Series.size ONCE
+                # per distinct series with a whole-series candidate (season_id IS NULL).
                 select(func.coalesce(func.sum(Series.size), 0))
-                .select_from(ReclaimCandidate)
-                .join(Series, ReclaimCandidate.series_id == Series.id)
-                .where(ReclaimCandidate.media_type == MediaType.SERIES)
+                .select_from(Series)
+                .where(
+                    Series.id.in_(
+                        select(ReclaimCandidate.series_id)
+                        .where(
+                            ReclaimCandidate.media_type == MediaType.SERIES,
+                            ReclaimCandidate.series_id.is_not(None),
+                            ReclaimCandidate.season_id.is_(None),
+                        )
+                        .distinct()
+                    )
+                )
                 .scalar_subquery()
-                .label("series_size_total"),
+                .label("series_full_size_total"),
+                # reclaimable season bytes: sum Season.size ONCE per distinct season
+                # with a candidate, EXCLUDING seasons whose parent series already has
+                # a whole-series candidate (would otherwise double-count).
+                select(func.coalesce(func.sum(Season.size), 0))
+                .select_from(Season)
+                .where(
+                    Season.id.in_(
+                        select(ReclaimCandidate.season_id)
+                        .where(ReclaimCandidate.season_id.is_not(None))
+                        .distinct()
+                    ),
+                    Season.series_id.notin_(
+                        select(ReclaimCandidate.series_id)
+                        .where(
+                            ReclaimCandidate.media_type == MediaType.SERIES,
+                            ReclaimCandidate.series_id.is_not(None),
+                            ReclaimCandidate.season_id.is_(None),
+                        )
+                    ),
+                )
+                .scalar_subquery()
+                .label("season_size_total"),
                 select(func.coalesce(func.sum(Movie.size), 0))
                 .select_from(Movie)
                 .where(Movie.removed_at.is_(None))
@@ -144,7 +189,9 @@ async def get_dashboard(
     movie_count = summary_row.movie_count or 0
     series_count = summary_row.series_count or 0
     movie_size_total = summary_row.movie_size_total or 0
-    series_size_total = summary_row.series_size_total or 0
+    series_size_total = (summary_row.series_full_size_total or 0) + (
+        summary_row.season_size_total or 0
+    )
     all_movies_size = summary_row.all_movies_size or 0
     all_series_size = summary_row.all_series_size or 0
     pending_requests = summary_row.pending_requests or 0

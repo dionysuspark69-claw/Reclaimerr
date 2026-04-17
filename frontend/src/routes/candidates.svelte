@@ -20,6 +20,7 @@
     type ReclaimCandidateEntry,
     type ProtectionRequest,
     type PaginatedResponse,
+    type ReclaimRule,
   } from "$lib/types/shared";
 
   interface DeleteResponse {
@@ -65,9 +66,13 @@
   const _sortByStore = createFilterState("candidates_sort_by", "created_at");
   const _sortOrderStore = createFilterState("candidates_sort_order", "desc");
   const _mediaTypeStore = createFilterState("candidates_media_type", "all");
+  const _ruleFilterStore = createFilterState("candidates_rule_filter", "all");
   let sortBy = $state(_sortByStore.getInitial());
   let sortOrder = $state(_sortOrderStore.getInitial());
   let mediaTypeFilter = $state(_mediaTypeStore.getInitial());
+  // "all" | "tdarr" | "<rule_id>"
+  let ruleFilter = $state(_ruleFilterStore.getInitial());
+  let availableRules = $state<ReclaimRule[]>([]);
   let currentPage = $state(1);
 
   const _perPageStore = createPerPageState("candidates_per_page");
@@ -215,13 +220,31 @@
   $effect(() => _sortByStore.save(sortBy));
   $effect(() => _sortOrderStore.save(sortOrder));
   $effect(() => _mediaTypeStore.save(mediaTypeFilter));
+  $effect(() => _ruleFilterStore.save(ruleFilter));
 
   $effect(() => {
     sortBy;
     sortOrder;
     mediaTypeFilter;
+    ruleFilter;
     perPage;
     if (mounted) loadCandidates(1);
+  });
+
+  // map ruleFilter state to a rule_id query param: "all" -> null, "tdarr" -> -1,
+  // otherwise parse as number. Keeping the special-value mapping server-agnostic.
+  const ruleFilterToParam = (value: string): string | null => {
+    if (value === "all") return null;
+    if (value === "tdarr") return "-1";
+    return value;
+  };
+
+  const ruleFilterLabel = $derived.by(() => {
+    if (ruleFilter === "all") return "All Sources";
+    if (ruleFilter === "tdarr") return "Tdarr";
+    const rid = Number(ruleFilter);
+    const match = availableRules.find((r) => r.id === rid);
+    return match?.name ?? "Rule";
   });
 
   const loadCandidates = async (page: number = currentPage) => {
@@ -246,6 +269,9 @@
       if (searchQuery.trim()) params.append("search", searchQuery.trim());
       if (mediaTypeFilter !== "all")
         params.append("media_type", mediaTypeFilter);
+
+      const ruleIdParam = ruleFilterToParam(ruleFilter);
+      if (ruleIdParam !== null) params.append("rule_id", ruleIdParam);
 
       data = await get_api<PaginatedResponse<ReclaimCandidateEntry>>(
         `/api/media/candidates?${params.toString()}`,
@@ -480,9 +506,18 @@
     row.seasons.reduce((acc, s) => acc + (s.estimated_space_gb ?? 0), 0) +
     (row.seriesEntry?.estimated_space_gb ?? 0);
 
+  const loadRules = async () => {
+    try {
+      availableRules = await get_api<ReclaimRule[]>("/api/rules");
+    } catch {
+      // non-fatal: dropdown just won't show rule options
+      availableRules = [];
+    }
+  };
+
   onMount(async () => {
     mounted = true;
-    await loadCandidates();
+    await Promise.all([loadCandidates(), loadRules()]);
   });
 
   onDestroy(() => {
@@ -634,7 +669,8 @@
   <div class="space-y-2">
     <h1 class="text-3xl font-bold text-foreground">Cleanup candidates</h1>
     <p class="text-muted-foreground">
-      Media flagged for deletion by your rules or Tdarr.
+      Media flagged for deletion by your rules or Tdarr. Reclaimerr never
+      deletes on its own — every delete requires an explicit confirmation here.
       {#if canBulkSelect}
         Select multiple items for bulk actions.
       {/if}
@@ -695,7 +731,7 @@
         </Select.Root>
       </div>
 
-      <!-- row 2 on mobile: media type + per page -->
+      <!-- row 2 on mobile: media type + rule source + per page -->
       <div class="flex flex-1 gap-2">
         <Select.Root type="single" bind:value={mediaTypeFilter}>
           <Select.Trigger class="flex-1 bg-card text-card-foreground">
@@ -721,6 +757,33 @@
               label="Series"
               class="text-card-foreground">Series</Select.Item
             >
+          </Select.Content>
+        </Select.Root>
+
+        <Select.Root type="single" bind:value={ruleFilter}>
+          <Select.Trigger class="flex-1 bg-card text-card-foreground">
+            {ruleFilterLabel}
+          </Select.Trigger>
+          <Select.Content class="bg-card">
+            <Select.Item
+              value="all"
+              label="All Sources"
+              class="text-card-foreground">All Sources</Select.Item
+            >
+            <Select.Item
+              value="tdarr"
+              label="Tdarr"
+              class="text-card-foreground">Tdarr</Select.Item
+            >
+            {#each availableRules as rule (rule.id)}
+              <Select.Item
+                value={rule.id.toString()}
+                label={rule.name}
+                class="text-card-foreground"
+              >
+                {rule.name}
+              </Select.Item>
+            {/each}
           </Select.Content>
         </Select.Root>
 

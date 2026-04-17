@@ -510,6 +510,13 @@ async def get_candidates(
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     search: str | None = Query(None, max_length=200),
     media_type: MediaType | None = Query(None),
+    rule_id: int | None = Query(
+        None,
+        description=(
+            "Filter candidates to those matched by a specific rule. "
+            "Pass -1 to filter to Tdarr-flagged candidates."
+        ),
+    ),
 ):
     """Get all reclaim candidates with media info and pending request status."""
     base_query = (
@@ -531,6 +538,11 @@ async def get_candidates(
     if media_type:
         base_query = base_query.where(ReclaimCandidate.media_type == media_type)
 
+    if rule_id is not None:
+        base_query = base_query.where(
+            ReclaimCandidate.matched_rule_ids.contains([rule_id])
+        )
+
     if search:
         search_term = f"%{search}%"
         base_query = base_query.where(
@@ -550,6 +562,11 @@ async def get_candidates(
 
     if media_type:
         count_query = count_query.where(ReclaimCandidate.media_type == media_type)
+
+    if rule_id is not None:
+        count_query = count_query.where(
+            ReclaimCandidate.matched_rule_ids.contains([rule_id])
+        )
 
     if search:
         search_term = f"%{search}%"
