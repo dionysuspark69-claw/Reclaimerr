@@ -15,6 +15,7 @@ on macOS, ~/.local/share/reclaimerr on Linux).
 """
 
 import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -174,6 +175,35 @@ def build_exe():
     )
 
 
+def prune_tzdata():
+    """Shrink the bundled IANA timezone db to just the Americas.
+
+    collect_all("backend") pulls in the `tzdata` package transitively via
+    apscheduler -> tzlocal (required on Windows, which has no system zoneinfo).
+    The full db covers every continent and adds several MB we never reference.
+    Keep America/* (the only region we target), Etc/* (for UTC/GMT aliases),
+    and the small top-level tab files; drop the rest.
+    """
+    for candidate in (
+        REPO_ROOT / "dist" / OUTPUT_NAME / "_internal" / "tzdata" / "zoneinfo",
+        REPO_ROOT / "dist" / OUTPUT_NAME / "tzdata" / "zoneinfo",
+    ):
+        if candidate.exists():
+            zoneinfo = candidate
+            break
+    else:
+        return
+
+    keep = {"America", "Etc"}
+    pruned = 0
+    for entry in zoneinfo.iterdir():
+        if entry.is_dir() and entry.name not in keep:
+            shutil.rmtree(entry)
+            pruned += 1
+    if pruned:
+        print(f"\n=== Pruned {pruned} non-America timezone region(s) from tzdata ===")
+
+
 def verify():
     exe = REPO_ROOT / "dist" / OUTPUT_NAME / f"{OUTPUT_NAME}{EXE_SUFFIX}"
     if exe.exists():
@@ -187,4 +217,5 @@ if __name__ == "__main__":
     build_frontend()
     write_spec()
     build_exe()
+    prune_tzdata()
     verify()
