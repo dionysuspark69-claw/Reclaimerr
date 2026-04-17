@@ -16,6 +16,7 @@
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import Copy from "@lucide/svelte/icons/copy";
+  import ChartLine from "@lucide/svelte/icons/chart-line";
   import { toTitleCase } from "$lib/utils/strings";
   import * as Avatar from "$lib/components/ui/avatar/index.js";
   import * as Tooltip from "$lib/components/ui/tooltip/index.js";
@@ -83,6 +84,13 @@
       icon: Copy,
       adminOnly: false,
       tooltip: "Same title across multiple libraries or with multiple file versions",
+    },
+    {
+      path: "/reports",
+      label: "Reports",
+      icon: ChartLine,
+      adminOnly: false,
+      tooltip: "Track how much disk space you've reclaimed over time",
     },
     {
       path: "/settings",

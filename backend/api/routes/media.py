@@ -674,7 +674,9 @@ async def delete_candidates(
     if not request.candidate_ids:
         return DeleteCandidatesResponse(deleted=0, failed=0)
 
-    deleted, failed = await delete_specific_candidates(request.candidate_ids)
+    deleted, failed = await delete_specific_candidates(
+        request.candidate_ids, user_id=user.id
+    )
     return DeleteCandidatesResponse(deleted=deleted, failed=failed)
 
 
@@ -902,7 +904,9 @@ async def resolve_duplicates_route(
     if not request.group_ids:
         return ResolveDuplicatesResponse(deleted=0, failed=0, groups_resolved=0)
 
-    deleted, failed, resolved = await resolve_duplicate_groups(request.group_ids)
+    deleted, failed, resolved = await resolve_duplicate_groups(
+        request.group_ids, user_id=user.id
+    )
     return ResolveDuplicatesResponse(
         deleted=deleted, failed=failed, groups_resolved=resolved
     )

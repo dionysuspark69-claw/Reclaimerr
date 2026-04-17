@@ -430,3 +430,42 @@ export interface LibraryOption {
   library_name: string;
   media_type: string;
 }
+
+export enum ReclaimSource {
+  RuleBased = "rule_based",
+  Duplicate = "duplicate",
+  Tdarr = "tdarr",
+  Manual = "manual",
+}
+
+export interface ReclaimSourceBucket {
+  count: number;
+  bytes: number;
+}
+
+export interface MonthlyReclaimBucket {
+  month: string;
+  bytes: number;
+}
+
+export interface RecentReclaimEvent {
+  id: number;
+  source: ReclaimSource;
+  media_type: MediaType;
+  media_title: string;
+  media_year: number | null;
+  bytes_reclaimed: number;
+  triggered_by_username: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface ReclaimReport {
+  total_bytes: number;
+  total_events: number;
+  bytes_last_30d: number;
+  bytes_last_7d: number;
+  by_source: Record<string, ReclaimSourceBucket>;
+  monthly_histogram: MonthlyReclaimBucket[];
+  recent: RecentReclaimEvent[];
+}

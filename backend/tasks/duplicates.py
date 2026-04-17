@@ -15,10 +15,11 @@ from backend.database.models import (
     GeneralSettings,
     Movie,
     MovieVersion,
+    ReclaimEvent,
     Series,
     SeriesServiceRef,
 )
-from backend.enums import MediaType, Task
+from backend.enums import MediaType, ReclaimSource, Task
 from backend.types import MEDIA_SERVERS
 
 # Priority boost applied when a version lives in the admin's preferred library.
@@ -232,8 +233,12 @@ async def _clear_existing_groups(db: AsyncSession) -> None:
     await db.execute(delete(DuplicateGroup))
 
 
-async def resolve_duplicate_groups(group_ids: list[int]) -> tuple[int, int, int]:
+async def resolve_duplicate_groups(
+    group_ids: list[int], user_id: int | None = None
+) -> tuple[int, int, int]:
     """Delete the non-keep candidates in each group via Plex.
+
+    `user_id`, when provided, is recorded on reclaim_events audit rows.
 
     Returns (files_deleted, files_failed, groups_resolved).
     """
@@ -302,6 +307,17 @@ async def resolve_duplicate_groups(group_ids: list[int]) -> tuple[int, int, int]
                 try:
                     await plex.delete_item(rating_key)
                     deleted += 1
+                    db.add(
+                        ReclaimEvent(
+                            source=ReclaimSource.DUPLICATE,
+                            media_type=group.media_type,
+                            media_title=group.title or "(unknown)",
+                            media_year=group.year,
+                            bytes_reclaimed=int(cand.size or 0),
+                            triggered_by_user_id=user_id,
+                            notes=f"{cand.library_name or cand.library_id or ''} · {cand.resolution or ''}".strip(" ·"),
+                        )
+                    )
                 except Exception as e:
                     LOG.error(
                         f"Failed to delete duplicate candidate (rating_key={rating_key}): {e}"

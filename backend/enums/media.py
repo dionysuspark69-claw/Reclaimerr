@@ -19,3 +19,12 @@ class ProtectionRequestStatus(StrEnum):
     PENDING = auto()
     APPROVED = auto()
     DENIED = auto()
+
+
+class ReclaimSource(StrEnum):
+    """Where a reclaim event originated, used for Reports breakdowns."""
+
+    RULE_BASED = auto()  # scheduled rule match / Candidates page delete
+    DUPLICATE = auto()  # Duplicates page resolve
+    TDARR = auto()  # Tdarr-flagged candidate delete
+    MANUAL = auto()  # user-initiated direct delete (fallback)

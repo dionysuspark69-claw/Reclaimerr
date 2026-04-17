@@ -14,12 +14,13 @@ from backend.database.models import (
     ProtectedMedia,
     ProtectionRequest,
     ReclaimCandidate,
+    ReclaimEvent,
     ReclaimRule,
     Season,
     Series,
     ServiceConfig,
 )
-from backend.enums import MediaType, NotificationType, Service, Task
+from backend.enums import MediaType, NotificationType, ReclaimSource, Service, Task
 from backend.services.notifications import notify_all_users
 from backend.types import MEDIA_SERVERS
 
@@ -1702,11 +1703,15 @@ async def _reset_seerr_request(tmdb_id: int, media_type: MediaType) -> None:
         LOG.warning(f"Failed to delete Seerr data for TMDB {tmdb_id}: {e}")
 
 
-async def delete_specific_candidates(candidate_ids: list[int]) -> tuple[int, int]:
+async def delete_specific_candidates(
+    candidate_ids: list[int], user_id: int | None = None
+) -> tuple[int, int]:
     """Deletes specific reclaim candidates by their IDs.
 
     Uses the same deletion priority as delete_cleanup_candidates:
     Radarr/Sonarr first, then Jellyfin/Plex (main server first) fallback.
+
+    `user_id`, when provided, is recorded on the reclaim_events audit rows.
 
     Returns (deleted_count, failed_count).
     """
@@ -1715,17 +1720,46 @@ async def delete_specific_candidates(candidate_ids: list[int]) -> tuple[int, int
 
     restrict = frozenset(candidate_ids)
 
-    # look up which types we're dealing with so we only invoke relevant paths
+    # Snapshot pre-delete metadata so we can emit reclaim_events rows for the
+    # candidates that actually get deleted. We need title/size/source before
+    # the candidate rows are gone.
+    snapshots: dict[int, dict] = {}
     async with async_db() as db:
         result = await db.execute(
-            select(ReclaimCandidate.id, ReclaimCandidate.media_type).where(
-                ReclaimCandidate.id.in_(restrict)
-            )
+            select(ReclaimCandidate).where(ReclaimCandidate.id.in_(restrict))
         )
-        rows = result.all()
+        candidates = result.scalars().all()
+        for cand in candidates:
+            title = ""
+            year: int | None = None
+            if cand.media_type is MediaType.MOVIE and cand.movie_id is not None:
+                movie = (
+                    await db.execute(select(Movie).where(Movie.id == cand.movie_id))
+                ).scalar_one_or_none()
+                if movie is not None:
+                    title = movie.title
+                    year = movie.year
+            elif cand.series_id is not None:
+                series = (
+                    await db.execute(select(Series).where(Series.id == cand.series_id))
+                ).scalar_one_or_none()
+                if series is not None:
+                    title = series.title
+                    year = series.year
 
-    found_ids = {r[0] for r in rows}
-    types = {r[1] for r in rows}
+            # Tdarr-sourced candidates carry the synthetic TDARR_RULE_ID (-1).
+            is_tdarr = -1 in (cand.matched_rule_ids or [])
+            bytes_reclaimed = int((cand.estimated_space_gb or 0) * (1024**3))
+            snapshots[cand.id] = {
+                "media_type": cand.media_type,
+                "title": title,
+                "year": year,
+                "bytes_reclaimed": bytes_reclaimed,
+                "source": ReclaimSource.TDARR if is_tdarr else ReclaimSource.RULE_BASED,
+            }
+
+    found_ids = set(snapshots.keys())
+    types = {s["media_type"] for s in snapshots.values()}
 
     LOG.info(
         f"Manual deletion of {len(found_ids)} candidate(s) requested "
@@ -1746,4 +1780,33 @@ async def delete_specific_candidates(candidate_ids: list[int]) -> tuple[int, int
 
     failed = max(0, len(found_ids) - deleted)
     LOG.info(f"Manual deletion complete: {deleted} deleted, {failed} failed")
+
+    # Any candidate row that's gone after the delete pass was successfully
+    # reclaimed — emit an audit row for it.
+    if found_ids:
+        async with async_db() as db:
+            remaining = (
+                await db.execute(
+                    select(ReclaimCandidate.id).where(
+                        ReclaimCandidate.id.in_(found_ids)
+                    )
+                )
+            ).scalars().all()
+            remaining_ids = set(remaining)
+            for cand_id in found_ids - remaining_ids:
+                snap = snapshots[cand_id]
+                if not snap["title"]:
+                    continue
+                db.add(
+                    ReclaimEvent(
+                        source=snap["source"],
+                        media_type=snap["media_type"],
+                        media_title=snap["title"],
+                        media_year=snap["year"],
+                        bytes_reclaimed=snap["bytes_reclaimed"],
+                        triggered_by_user_id=user_id,
+                    )
+                )
+            await db.commit()
+
     return deleted, failed

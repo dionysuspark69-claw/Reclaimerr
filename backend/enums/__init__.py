@@ -1,6 +1,6 @@
 ﻿from .alerts import AlertLevel
 from .logging import LogLevel, LogSource
-from .media import MediaType, ProtectionRequestStatus, Service
+from .media import MediaType, ProtectionRequestStatus, ReclaimSource, Service
 from .services import SeerrRequestStatus
 from .tasks import (
     BackgroundJobStatus,
@@ -22,6 +22,7 @@ __all__ = [
     "Service",
     "MediaType",
     "ProtectionRequestStatus",
+    "ReclaimSource",
     # tasks
     "TaskStatus",
     "BackgroundJobStatus",
