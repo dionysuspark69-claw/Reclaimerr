@@ -16,6 +16,7 @@ from backend.database.models import (
     ProtectedMedia,
     ProtectionRequest,
     ReclaimCandidate,
+    ReclaimRule,
     Season,
     Series,
     User,
@@ -27,6 +28,7 @@ from backend.models.media import (
     DeleteCandidatesResponse,
     DuplicateCandidateEntry,
     DuplicateGroupEntry,
+    MatchedRuleRef,
     MediaStatusInfo,
     MovieVersionResponse,
     MovieWithStatus,
@@ -609,6 +611,25 @@ async def get_candidates(
         )
         pending_series = {r[0] for r in req_result.all()}
 
+    # Resolve rule names for the candidates in this page in one query so
+    # the UI can show "picked up by <rule name>" badges instead of parsing
+    # the reason string. Tdarr-sourced candidates carry a synthetic rule
+    # id of -1 which won't match any real row.
+    rule_id_set: set[int] = set()
+    for row in rows:
+        for rid in row.ReclaimCandidate.matched_rule_ids or []:
+            if rid > 0:
+                rule_id_set.add(rid)
+
+    rule_name_by_id: dict[int, str] = {}
+    if rule_id_set:
+        rule_rows = await db.execute(
+            select(ReclaimRule.id, ReclaimRule.name).where(
+                ReclaimRule.id.in_(rule_id_set)
+            )
+        )
+        rule_name_by_id = {rid: name for rid, name in rule_rows.all()}
+
     items_out: list[CandidateEntry] = []
     for row in rows:
         c = row.ReclaimCandidate
@@ -624,6 +645,14 @@ async def get_candidates(
         if media_id is None or media_title is None:
             continue
 
+        matched_ids = c.matched_rule_ids or []
+        source = "tdarr" if -1 in matched_ids else "rule"
+        matched_rules = [
+            MatchedRuleRef(id=rid, name=rule_name_by_id[rid])
+            for rid in matched_ids
+            if rid in rule_name_by_id
+        ]
+
         items_out.append(
             CandidateEntry(
                 id=c.id,
@@ -633,6 +662,8 @@ async def get_candidates(
                 media_year=media_year,
                 poster_url=poster_url,
                 reason=c.reason,
+                source=source,
+                matched_rules=matched_rules,
                 estimated_space_gb=c.estimated_space_gb,
                 has_pending_request=has_pending,
                 created_at=to_utc_isoformat(c.created_at) or "",

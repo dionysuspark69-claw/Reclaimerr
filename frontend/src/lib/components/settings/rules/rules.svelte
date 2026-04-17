@@ -11,6 +11,7 @@
   import Trash2 from "@lucide/svelte/icons/trash-2";
   import Clapperboard from "@lucide/svelte/icons/clapperboard";
   import Tv from "@lucide/svelte/icons/tv";
+  import Play from "@lucide/svelte/icons/play";
   import { toast } from "svelte-sonner";
   import {
     MediaType,
@@ -35,6 +36,9 @@
   // delete dialog states
   let showDeleteDialog = $state(false);
   let ruleToDelete = $state<ReclaimRule | null>(null);
+
+  // which rule is currently running a preview (used to disable the button)
+  let previewingRuleId = $state<number | null>(null);
 
   // additional states
   let isSynced = $state(true); // assume synced until we check
@@ -114,6 +118,41 @@
       );
     } catch (err: any) {
       toast.error(`Error updating rule: ${err.message}`);
+    }
+  };
+
+  // dry-run a rule and toast the match count
+  const previewRule = async (rule: ReclaimRule) => {
+    if (previewingRuleId !== null) return;
+    previewingRuleId = rule.id;
+    try {
+      const result = await post_api<{
+        movies: number;
+        series: number;
+        seasons: number;
+        total: number;
+      }>(`/api/rules/${rule.id}/preview`, {});
+      if (result.total === 0) {
+        toast.info(`"${rule.name}" didn't pick up any media`);
+      } else if (rule.media_type === MediaType.Movie) {
+        toast.success(
+          `"${rule.name}" would pick up ${result.movies} movie${result.movies === 1 ? "" : "s"}`,
+        );
+      } else {
+        const parts: string[] = [];
+        if (result.series) parts.push(`${result.series} series`);
+        if (result.seasons)
+          parts.push(
+            `${result.seasons} season${result.seasons === 1 ? "" : "s"}`,
+          );
+        toast.success(
+          `"${rule.name}" would pick up ${parts.join(" + ") || "0 items"}`,
+        );
+      }
+    } catch (err: any) {
+      toast.error(`Preview failed: ${err.message}`);
+    } finally {
+      previewingRuleId = null;
     }
   };
 
@@ -382,6 +421,21 @@
                     onCheckedChange={() => toggleRuleEnabled(rule)}
                     class="cursor-pointer"
                   />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onclick={() => previewRule(rule)}
+                    disabled={previewingRuleId !== null}
+                    class="text-foreground cursor-pointer gap-1.5"
+                    title="Run this rule now and see how many items it picks up. Doesn't delete anything."
+                  >
+                    {#if previewingRuleId === rule.id}
+                      <Spinner class="size-4" />
+                    {:else}
+                      <Play class="size-4" />
+                    {/if}
+                    <span>Preview</span>
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"

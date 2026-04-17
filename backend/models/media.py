@@ -257,6 +257,13 @@ class PaginatedMediaResponse(BaseModel):
     total_pages: int
 
 
+class MatchedRuleRef(BaseModel):
+    """A rule that picked up a candidate (id + display name)."""
+
+    id: int
+    name: str
+
+
 class CandidateEntry(BaseModel):
     """A single reclaim candidate with enough info to display and act on."""
 
@@ -267,6 +274,11 @@ class CandidateEntry(BaseModel):
     media_year: int | None
     poster_url: str | None
     reason: str
+    # "rule" when at least one real rule matched; "tdarr" when only the
+    # synthetic Tdarr rule id is present. Lets the UI show a source badge
+    # without re-parsing the reason string.
+    source: str
+    matched_rules: list[MatchedRuleRef]
     estimated_space_gb: float | None
     has_pending_request: bool
     created_at: str

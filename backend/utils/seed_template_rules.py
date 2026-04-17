@@ -22,11 +22,44 @@ _TEMPLATES: list[dict] = [
         min_days_since_added=180,
     ),
     dict(
+        name="Template: huge movies that sat untouched for a year",
+        media_type=MediaType.MOVIE,
+        enabled=False,
+        include_never_watched=True,
+        min_size=10 * 1024 * 1024 * 1024,  # 10 GB
+        min_days_since_added=365,
+    ),
+    dict(
+        name="Template: movies watched once a long time ago",
+        media_type=MediaType.MOVIE,
+        enabled=False,
+        include_never_watched=False,
+        max_view_count=1,
+        min_days_since_last_watched=730,  # not touched in 2 years
+    ),
+    dict(
+        name="Template: obscure movies with no ratings signal",
+        media_type=MediaType.MOVIE,
+        enabled=False,
+        include_never_watched=True,
+        max_vote_count=20,
+        max_popularity=5.0,
+        min_days_since_added=365,
+    ),
+    dict(
         name="Template: stale series nobody's watched",
         media_type=MediaType.SERIES,
         enabled=False,
         include_never_watched=True,
         min_days_since_added=365,
+    ),
+    dict(
+        name="Template: low-rated series nobody finished",
+        media_type=MediaType.SERIES,
+        enabled=False,
+        include_never_watched=False,
+        max_vote_average=6.0,
+        min_days_since_last_watched=365,
     ),
 ]
 
