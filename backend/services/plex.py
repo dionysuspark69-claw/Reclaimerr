@@ -517,27 +517,44 @@ class PlexService:
         """Get aggregated series data with optional section inclusion."""
         series = await self.get_series(included_libraries=included_libraries)
 
-        return [
-            AggregatedSeriesData(
-                id=s.id,
-                name=s.name,
-                year=s.year,
-                service=Service.PLEX,
-                library_id=s.library_id,
-                library_name=s.library_name,
-                path=s.path,
-                added_at=s.added_at,
-                premiere_date=None,  # plex doesn't provide premiere date directly
-                external_ids=s.external_ids,
-                size=s.size,
-                view_count=s.view_count,
-                last_viewed_at=s.last_viewed_at,
-                never_watched=(s.view_count == 0),
-                played_by_user_count=None,  # plex provides global counts, not per-user
-                season_data=s.season_data,
+        result = []
+        for s in series:
+            # Plex's show-level `viewCount` only reflects shows marked watched
+            # as a whole — it stays 0 for the common case of a partially-watched
+            # series. Aggregate the episode-level view counts we already summed
+            # into season_data so partially-watched shows don't register as
+            # never_watched.
+            season_view_sum = sum((sd.view_count or 0) for sd in s.season_data)
+            view_count = max(season_view_sum, s.view_count or 0)
+
+            season_lvas = [sd.last_viewed_at for sd in s.season_data if sd.last_viewed_at]
+            last_viewed_at = s.last_viewed_at
+            if season_lvas:
+                max_season_lva = max(season_lvas)
+                if last_viewed_at is None or max_season_lva > last_viewed_at:
+                    last_viewed_at = max_season_lva
+
+            result.append(
+                AggregatedSeriesData(
+                    id=s.id,
+                    name=s.name,
+                    year=s.year,
+                    service=Service.PLEX,
+                    library_id=s.library_id,
+                    library_name=s.library_name,
+                    path=s.path,
+                    added_at=s.added_at,
+                    premiere_date=None,  # plex doesn't provide premiere date directly
+                    external_ids=s.external_ids,
+                    size=s.size,
+                    view_count=view_count,
+                    last_viewed_at=last_viewed_at,
+                    never_watched=(view_count == 0),
+                    played_by_user_count=None,  # plex provides global counts, not per-user
+                    season_data=s.season_data,
+                )
             )
-            for s in series
-        ]
+        return result
 
     @staticmethod
     def _parse_external_ids(media: dict) -> ExternalIDs | None:
