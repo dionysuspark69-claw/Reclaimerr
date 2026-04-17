@@ -20,7 +20,6 @@
   import CalendarClock from "@lucide/svelte/icons/calendar-clock";
   import Boxes from "@lucide/svelte/icons/boxes";
   import Server from "@lucide/svelte/icons/server";
-  import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
   import RadarrSVG from "$lib/components/svgs/RadarrSVG.svelte";
   import SonarrSVG from "$lib/components/svgs/SonarrSVG.svelte";
   import SeerrSVG from "$lib/components/svgs/SeerrSVG.svelte";
