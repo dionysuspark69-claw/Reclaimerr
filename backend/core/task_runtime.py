@@ -12,7 +12,9 @@ from backend.enums import BackgroundJobStatus, BackgroundJobType, Task
 from backend.jobs import enqueue_background_job
 from backend.models.jobs import TaskRunJobPayload
 from backend.tasks.cleanup import scan_cleanup_candidates, tag_cleanup_candidates
+from backend.tasks.duplicates import scan_duplicates
 from backend.tasks.house_keeping import weekly_house_keeping
+from backend.tasks.tdarr_scan import scan_tdarr_flagged
 from backend.tasks.sync import (
     resync_media,
     sync_linked_data,
@@ -29,6 +31,7 @@ MAIN_SERVER_REQUIRED_TASKS: frozenset[Task] = frozenset(
         Task.SYNC_LINKED_DATA,
         Task.SCAN_CLEANUP_CANDIDATES,
         Task.TAG_CLEANUP_CANDIDATES,
+        Task.FIND_DUPLICATES,
     }
 )
 
@@ -116,6 +119,12 @@ async def execute_task(task: Task) -> dict[str, Any] | None:
         return
     if task is Task.TAG_CLEANUP_CANDIDATES:
         await tag_cleanup_candidates()
+        return
+    if task is Task.FIND_DUPLICATES:
+        await scan_duplicates()
+        return
+    if task is Task.SCAN_TDARR_FLAGGED:
+        await scan_tdarr_flagged()
         return
     if task is Task.WEEKLY_HOUSE_KEEPING:
         await weekly_house_keeping()

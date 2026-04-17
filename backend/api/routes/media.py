@@ -10,6 +10,8 @@ from backend.core.auth import get_current_user, has_permission
 from backend.core.utils.datetime_utils import to_utc_isoformat
 from backend.database import get_db
 from backend.database.models import (
+    DuplicateCandidate,
+    DuplicateGroup,
     Movie,
     ProtectedMedia,
     ProtectionRequest,
@@ -18,21 +20,27 @@ from backend.database.models import (
     Series,
     User,
 )
-from backend.enums import MediaType, Permission, ProtectionRequestStatus, UserRole
+from backend.enums import MediaType, Permission, ProtectionRequestStatus, Task, UserRole
 from backend.models.media import (
     CandidateEntry,
     DeleteCandidatesRequest,
     DeleteCandidatesResponse,
+    DuplicateCandidateEntry,
+    DuplicateGroupEntry,
     MediaStatusInfo,
     MovieVersionResponse,
     MovieWithStatus,
     PaginatedCandidatesResponse,
+    PaginatedDuplicatesResponse,
     PaginatedMediaResponse,
+    ResolveDuplicatesRequest,
+    ResolveDuplicatesResponse,
     SeasonWithStatus,
     SeriesServiceRefResponse,
     SeriesWithStatus,
 )
 from backend.tasks.cleanup import delete_specific_candidates
+from backend.tasks.duplicates import resolve_duplicate_groups
 
 router = APIRouter(prefix="/api/media", tags=["media"])
 
@@ -668,3 +676,232 @@ async def delete_candidates(
 
     deleted, failed = await delete_specific_candidates(request.candidate_ids)
     return DeleteCandidatesResponse(deleted=deleted, failed=failed)
+
+
+@router.post("/scan-duplicates")
+async def scan_duplicates_route(
+    user: Annotated[User, Depends(get_current_user)],
+):
+    """Enqueue a duplicate-finder scan. Returns whether it was newly queued."""
+    if not (
+        user.role is UserRole.ADMIN or has_permission(user, Permission.MANAGE_RECLAIM)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Manage reclaim permission required",
+        )
+    # Local import to avoid circular dependency at module load time.
+    from backend.core.task_runtime import request_task_run
+
+    _, queued = await request_task_run(Task.FIND_DUPLICATES)
+    return {"queued": queued}
+
+
+@router.get("/duplicates", response_model=PaginatedDuplicatesResponse)
+async def get_duplicates(
+    _user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=1, le=200),
+    sort_by: str = Query(
+        "reclaimable_size",
+        pattern="^(reclaimable_size|total_size|created_at|title)$",
+    ),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
+    media_type: MediaType | None = Query(None),
+    search: str | None = Query(None, max_length=200),
+    include_resolved: bool = Query(False),
+):
+    """List duplicate groups with their candidate copies."""
+    base = select(DuplicateGroup)
+    count_q = select(func.count(DuplicateGroup.id))
+
+    if media_type is not None:
+        base = base.where(DuplicateGroup.media_type == media_type)
+        count_q = count_q.where(DuplicateGroup.media_type == media_type)
+
+    if not include_resolved:
+        base = base.where(DuplicateGroup.resolved.is_(False))
+        count_q = count_q.where(DuplicateGroup.resolved.is_(False))
+
+    if search:
+        like = f"%{search}%"
+        base = base.where(DuplicateGroup.title.ilike(like))
+        count_q = count_q.where(DuplicateGroup.title.ilike(like))
+
+    total = (await db.execute(count_q)).scalar_one() or 0
+
+    sort_col = {
+        "reclaimable_size": DuplicateGroup.reclaimable_size,
+        "total_size": DuplicateGroup.total_size,
+        "created_at": DuplicateGroup.created_at,
+        "title": DuplicateGroup.title,
+    }[sort_by]
+    if sort_order == "desc":
+        sort_col = sort_col.desc()
+    else:
+        sort_col = sort_col.asc()
+
+    offset = (page - 1) * per_page
+    result = await db.execute(
+        base.order_by(sort_col)
+        .offset(offset)
+        .limit(per_page)
+        .options(selectinload(DuplicateGroup.candidates))
+    )
+    groups = result.scalars().all()
+
+    # total reclaimable across all pages (same filters)
+    reclaim_sum_q = select(func.coalesce(func.sum(DuplicateGroup.reclaimable_size), 0))
+    if media_type is not None:
+        reclaim_sum_q = reclaim_sum_q.where(DuplicateGroup.media_type == media_type)
+    if not include_resolved:
+        reclaim_sum_q = reclaim_sum_q.where(DuplicateGroup.resolved.is_(False))
+    if search:
+        like = f"%{search}%"
+        reclaim_sum_q = reclaim_sum_q.where(DuplicateGroup.title.ilike(like))
+    total_reclaimable = (await db.execute(reclaim_sum_q)).scalar_one() or 0
+
+    # fetch poster URLs for the groups on this page
+    movie_ids = [g.movie_id for g in groups if g.movie_id is not None]
+    series_ids = [g.series_id for g in groups if g.series_id is not None]
+    movie_posters: dict[int, str | None] = {}
+    series_posters: dict[int, str | None] = {}
+    if movie_ids:
+        mres = await db.execute(
+            select(Movie.id, Movie.poster_url).where(Movie.id.in_(movie_ids))
+        )
+        movie_posters = {row[0]: row[1] for row in mres.all()}
+    if series_ids:
+        sres = await db.execute(
+            select(Series.id, Series.poster_url).where(Series.id.in_(series_ids))
+        )
+        series_posters = {row[0]: row[1] for row in sres.all()}
+
+    items: list[DuplicateGroupEntry] = []
+    for g in groups:
+        media_id = g.movie_id if g.media_type is MediaType.MOVIE else g.series_id
+        poster = (
+            movie_posters.get(g.movie_id)
+            if g.media_type is MediaType.MOVIE
+            else series_posters.get(g.series_id)
+        )
+        items.append(
+            DuplicateGroupEntry(
+                id=g.id,
+                media_type=g.media_type.value,
+                media_id=media_id,
+                title=g.title,
+                year=g.year,
+                poster_url=poster,
+                detection_kind=g.detection_kind,
+                candidate_count=g.candidate_count,
+                total_size=g.total_size,
+                reclaimable_size=g.reclaimable_size,
+                resolved=g.resolved,
+                created_at=to_utc_isoformat(g.created_at) or "",
+                candidates=[
+                    DuplicateCandidateEntry(
+                        id=c.id,
+                        service=c.service.value,
+                        library_id=c.library_id,
+                        library_name=c.library_name,
+                        path=c.path,
+                        size=c.size,
+                        container=c.container,
+                        resolution=c.resolution,
+                        score=c.score,
+                        keep=c.keep,
+                    )
+                    for c in sorted(
+                        g.candidates or [], key=lambda x: x.score, reverse=True
+                    )
+                ],
+            )
+        )
+
+    total_pages = (total + per_page - 1) // per_page if total else 0
+    return PaginatedDuplicatesResponse(
+        items=items,
+        total=total,
+        page=page,
+        per_page=per_page,
+        total_pages=total_pages,
+        total_reclaimable_bytes=int(total_reclaimable),
+    )
+
+
+@router.post("/duplicates/resolve", response_model=ResolveDuplicatesResponse)
+async def resolve_duplicates_route(
+    request: ResolveDuplicatesRequest,
+    user: Annotated[User, Depends(get_current_user)],
+):
+    """Delete the non-keep copies in each provided duplicate group via Plex."""
+    if not (
+        user.role is UserRole.ADMIN or has_permission(user, Permission.MANAGE_RECLAIM)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Manage reclaim permission required",
+        )
+    if not request.group_ids:
+        return ResolveDuplicatesResponse(deleted=0, failed=0, groups_resolved=0)
+
+    deleted, failed, resolved = await resolve_duplicate_groups(request.group_ids)
+    return ResolveDuplicatesResponse(
+        deleted=deleted, failed=failed, groups_resolved=resolved
+    )
+
+
+@router.post("/toggle-duplicate-keep")
+async def toggle_duplicate_keep(
+    candidate_id: Annotated[int, Query(ge=1)],
+    keep: Annotated[bool, Query()],
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    """Toggle whether a duplicate candidate is the keeper in its group.
+
+    When setting keep=True, any other candidate in the same group is set to False.
+    """
+    if not (
+        user.role is UserRole.ADMIN or has_permission(user, Permission.MANAGE_RECLAIM)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Manage reclaim permission required",
+        )
+
+    result = await db.execute(
+        select(DuplicateCandidate).where(DuplicateCandidate.id == candidate_id)
+    )
+    cand = result.scalar_one_or_none()
+    if cand is None:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    if keep:
+        others = await db.execute(
+            select(DuplicateCandidate).where(
+                DuplicateCandidate.group_id == cand.group_id,
+                DuplicateCandidate.id != cand.id,
+            )
+        )
+        for other in others.scalars().all():
+            other.keep = False
+        cand.keep = True
+    else:
+        cand.keep = False
+
+    # recompute reclaimable_size for the group
+    res_group = await db.execute(
+        select(DuplicateGroup)
+        .where(DuplicateGroup.id == cand.group_id)
+        .options(selectinload(DuplicateGroup.candidates))
+    )
+    group = res_group.scalar_one()
+    keep_size = sum(c.size for c in group.candidates if c.keep)
+    total_size = sum(c.size for c in group.candidates)
+    group.reclaimable_size = max(0, total_size - keep_size)
+
+    await db.commit()
+    return {"ok": True, "reclaimable_size": group.reclaimable_size}

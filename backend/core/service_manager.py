@@ -10,6 +10,7 @@ from backend.services.radarr import RadarrClient
 from backend.services.seerr import SeerrClient
 from backend.services.sonarr import SonarrClient
 from backend.services.tautulli import TautulliService
+from backend.services.tdarr import TdarrClient
 
 
 class ServiceManager:
@@ -27,6 +28,7 @@ class ServiceManager:
         self._radarr: RadarrClient | None = None
         self._sonarr: SonarrClient | None = None
         self._seerr: SeerrClient | None = None
+        self._tdarr: TdarrClient | None = None
 
         LOG.info("ServiceManager initialized")
 
@@ -65,6 +67,11 @@ class ServiceManager:
         """Get Seerr service (must be initialized first)."""
         return self._seerr
 
+    @property
+    def tdarr(self) -> TdarrClient | None:
+        """Get Tdarr service (must be initialized first)."""
+        return self._tdarr
+
     async def get_status(self) -> dict[str, bool]:
         """Get connection status of all clients."""
         return {
@@ -73,6 +80,7 @@ class ServiceManager:
             "radarr": self._radarr is not None,
             "sonarr": self._sonarr is not None,
             "seerr": self._seerr is not None,
+            "tdarr": self._tdarr is not None,
         }
 
     async def test_service(
@@ -90,6 +98,8 @@ class ServiceManager:
                 return await SonarrClient.test_service(url, api_key), ""
             elif service_type is Service.SEERR:
                 return await SeerrClient.test_service(url, api_key), ""
+            elif service_type is Service.TDARR:
+                return await TdarrClient.test_service(url, api_key), ""
         except niq_exceptions.ConnectionError:
             return (
                 False,
@@ -112,7 +122,7 @@ class ServiceManager:
 
     async def return_service(
         self, service_type: Service
-    ) -> PlexService | TautulliService | RadarrClient | SonarrClient | SeerrClient | None:
+    ) -> PlexService | TautulliService | RadarrClient | SonarrClient | SeerrClient | TdarrClient | None:
         """Return the requested service instance."""
         if service_type is Service.PLEX:
             return self._plex
@@ -124,6 +134,8 @@ class ServiceManager:
             return self._sonarr
         elif service_type is Service.SEERR:
             return self._seerr
+        elif service_type is Service.TDARR:
+            return self._tdarr
         return None
 
     async def initialize_plex(
@@ -197,6 +209,21 @@ class ServiceManager:
             LOG.error(f"Failed to initialize Sonarr service: {e}")
             return None
 
+    async def initialize_tdarr(
+        self, base_url: str, api_key: str
+    ) -> TdarrClient | None:
+        """Initialize Tdarr service with provided config."""
+        try:
+            self._tdarr = TdarrClient(api_key=api_key, base_url=base_url)
+            if not await self._tdarr.health():
+                LOG.error(f"Tdarr service health check failed: {base_url}")
+                raise ValueError(f"Tdarr service health check failed: {base_url}")
+            LOG.info(f"Tdarr service initialized: {base_url}")
+            return self._tdarr
+        except Exception as e:
+            LOG.error(f"Failed to initialize Tdarr service: {e}")
+            return None
+
     async def initialize_seerr(self, base_url: str, api_key: str) -> SeerrClient | None:
         """Initialize Seerr service with provided config."""
         try:
@@ -250,6 +277,13 @@ class ServiceManager:
             LOG.info("Seerr service cleared")
         self._seerr = None
 
+    async def clear_tdarr(self) -> None:
+        """Clear Tdarr service (call before reinitializing)."""
+        if self._tdarr and self._tdarr.session:
+            await self._tdarr.session.close()
+            LOG.info("Tdarr service cleared")
+        self._tdarr = None
+
     async def clear_all(self) -> None:
         """Clear all clients (call before reinitializing from database)."""
         LOG.info("Clearing all clients")
@@ -258,6 +292,7 @@ class ServiceManager:
         await self.clear_radarr()
         await self.clear_sonarr()
         await self.clear_seerr()
+        await self.clear_tdarr()
 
 
 # global manager instance

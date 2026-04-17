@@ -1,12 +1,16 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { get_api } from "$lib/api";
+  import { push } from "svelte-spa-router";
+  import { get_api, post_api } from "$lib/api";
   import ErrorBox from "$lib/components/error-box.svelte";
-  import Notice from "$lib/components/notice.svelte";
+  import { Button } from "$lib/components/ui/button/index.js";
   import { formatDate, formatDistanceToNow } from "$lib/utils/date";
+  import { toast } from "svelte-sonner";
   import TrendingUp from "@lucide/svelte/icons/trending-up";
   import TrendingDown from "@lucide/svelte/icons/trending-down";
   import Minus from "@lucide/svelte/icons/minus";
+  import Sparkles from "@lucide/svelte/icons/sparkles";
+  import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import type {
     DashboardActivityItem,
     DashboardResponse,
@@ -21,6 +25,23 @@
   let clockTimer: ReturnType<typeof setInterval> | null = null;
   let nowTick = $state(Date.now());
   let isFetching = false;
+  let syncing = $state(false);
+
+  const runSyncMedia = async () => {
+    syncing = true;
+    try {
+      await post_api("/api/tasks/tasks/sync_media/run");
+      toast.success(
+        "Sync Media queued — library will populate shortly.",
+      );
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed to start sync.");
+    } finally {
+      syncing = false;
+    }
+  };
+
+  const goToReclaim = () => push("/reclaim");
 
   // derived state
   const activity = $derived(dashboard?.activity ?? []);
@@ -223,12 +244,61 @@
       {#if dashboard}
         <div class="space-y-6 overflow-x-hidden">
           {#if showSyncNotice}
-            <Notice type="warning" title="No Media Found">
-              A media server is configured but no media has been synced yet. Run <strong
-                >Sync Media</strong
+            <div
+              class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-5 flex flex-col sm:flex-row
+                sm:items-center gap-3 justify-between"
+            >
+              <div>
+                <p class="font-semibold text-foreground">No media found</p>
+                <p class="text-sm text-muted-foreground mt-1">
+                  A media server is configured but nothing has been synced yet.
+                </p>
+              </div>
+              <Button
+                onclick={runSyncMedia}
+                disabled={syncing}
+                class="cursor-pointer"
               >
-              in <strong>Tasks</strong> to populate your library.
-            </Notice>
+                <RefreshCw class="size-4 {syncing ? 'animate-spin' : ''}" />
+                {syncing ? "Syncing..." : "Sync now"}
+              </Button>
+            </div>
+          {/if}
+
+          <!-- hero reclaim CTA: primary "what should I delete" entry point -->
+          {#if dashboard.kpis.reclaimable_total_gb > 0}
+            <button
+              type="button"
+              onclick={goToReclaim}
+              class="w-full text-left bg-gradient-to-br from-primary/15 via-card to-card rounded-lg border
+                border-primary/40 p-6 md:p-8 hover:border-primary transition-colors cursor-pointer group"
+            >
+              <div
+                class="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+              >
+                <div>
+                  <div
+                    class="flex items-center gap-2 text-sm uppercase tracking-wider text-muted-foreground"
+                  >
+                    <Sparkles class="size-4 text-primary" />
+                    Total reclaimable
+                  </div>
+                  <p class="text-4xl md:text-5xl font-bold text-primary mt-2">
+                    {formatSize(dashboard.kpis.reclaimable_total_gb)}
+                  </p>
+                  <p class="text-muted-foreground mt-2">
+                    Review candidates and duplicates in one place.
+                  </p>
+                </div>
+                <div
+                  class="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-md bg-primary
+                    text-primary-foreground font-semibold group-hover:gap-3 transition-all"
+                >
+                  Review & reclaim
+                  <TrendingUp class="size-5" />
+                </div>
+              </div>
+            </button>
           {/if}
           <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <!-- movies -->

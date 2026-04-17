@@ -11,6 +11,8 @@
   import Series from "./routes/series.svelte";
   import Protected from "./routes/protected.svelte";
   import Candidates from "./routes/candidates.svelte";
+  import Duplicates from "./routes/duplicates.svelte";
+  import Reclaim from "./routes/reclaim.svelte";
   import Settings from "./routes/settings.svelte";
   import { Toaster } from "$lib/components/ui/sonner/index.js";
   import SystemAlerts from "$lib/components/system-alerts.svelte";
@@ -27,6 +29,8 @@
     "/protected": Protected,
     "/protection-requests": Requests,
     "/candidates": Candidates,
+    "/duplicates": Duplicates,
+    "/reclaim": Reclaim,
     "/settings": Settings,
     "/setup": Setup,
   };

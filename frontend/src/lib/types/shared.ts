@@ -44,6 +44,7 @@ export enum SettingsTab {
   Radarr = "radarr",
   Sonarr = "sonarr",
   Seerr = "seerr",
+  Tdarr = "tdarr",
   General = "general",
   Tasks = "tasks",
   BackgroundJobs = "background_jobs",
@@ -314,6 +315,44 @@ export interface ProtectedEntry {
   expires_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DuplicateCandidateEntry {
+  id: number;
+  service: string;
+  library_id: string | null;
+  library_name: string | null;
+  path: string | null;
+  size: number;
+  container: string | null;
+  resolution: string | null;
+  score: number;
+  keep: boolean;
+}
+
+export interface DuplicateGroupEntry {
+  id: number;
+  media_type: MediaType;
+  media_id: number | null;
+  title: string | null;
+  year: number | null;
+  poster_url: string | null;
+  detection_kind: string;
+  candidate_count: number;
+  total_size: number;
+  reclaimable_size: number;
+  resolved: boolean;
+  created_at: string;
+  candidates: DuplicateCandidateEntry[];
+}
+
+export interface PaginatedDuplicatesResponse {
+  items: DuplicateGroupEntry[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+  total_reclaimable_bytes: number;
 }
 
 export interface ReclaimCandidateEntry {

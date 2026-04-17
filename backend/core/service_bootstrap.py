@@ -43,3 +43,5 @@ async def load_enabled_services() -> None:
             await service_manager.initialize_sonarr(config.base_url, api_key)
         elif config.service_type is Service.SEERR:
             await service_manager.initialize_seerr(config.base_url, api_key)
+        elif config.service_type is Service.TDARR:
+            await service_manager.initialize_tdarr(config.base_url, api_key)

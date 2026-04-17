@@ -7,6 +7,7 @@ class Service(StrEnum):
     PLEX = auto()
     SEERR = auto()
     TAUTULLI = auto()
+    TDARR = auto()
 
 
 class MediaType(StrEnum):
