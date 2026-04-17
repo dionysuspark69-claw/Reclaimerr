@@ -275,6 +275,8 @@ async def resolve_duplicate_groups(
 
             for cand in to_delete:
                 rating_key: str | None = None
+                mv: MovieVersion | None = None
+                ref: SeriesServiceRef | None = None
                 if cand.movie_version_id is not None:
                     mv_res = await db.execute(
                         select(MovieVersion).where(
@@ -299,8 +301,17 @@ async def resolve_duplicate_groups(
                     group_failed = True
                     continue
 
+                # Same Plex item may back multiple candidate rows (e.g. two
+                # MovieVersion rows pointing at one Plex movie). We only
+                # call plex.delete_item once per rating_key, but we still
+                # need to prune each underlying row so a follow-up scan
+                # won't resurrect the group from stale DB state.
                 if rating_key in seen_item_ids:
                     deleted += 1
+                    if mv is not None:
+                        await db.delete(mv)
+                    elif ref is not None:
+                        await db.delete(ref)
                     continue
                 seen_item_ids.add(rating_key)
 
@@ -318,6 +329,12 @@ async def resolve_duplicate_groups(
                             notes=f"{cand.library_name or cand.library_id or ''} · {cand.resolution or ''}".strip(" ·"),
                         )
                     )
+                    # Prune the underlying row so scan_duplicates can't
+                    # re-create this group before the next sync_media.
+                    if mv is not None:
+                        await db.delete(mv)
+                    elif ref is not None:
+                        await db.delete(ref)
                 except Exception as e:
                     LOG.error(
                         f"Failed to delete duplicate candidate (rating_key={rating_key}): {e}"
