@@ -74,6 +74,48 @@ _TEMPLATES: list[dict] = [
         max_vote_average=6.0,
         min_days_since_last_watched=365,
     ),
+    dict(
+        name="Template: huge series nobody's watched",
+        media_type=MediaType.SERIES,
+        enabled=False,
+        include_never_watched=True,
+        max_view_count=0,
+        min_size=50 * 1024 * 1024 * 1024,  # 50 GB
+        min_days_since_added=365,
+    ),
+    dict(
+        name="Template: obscure series with no ratings signal",
+        media_type=MediaType.SERIES,
+        enabled=False,
+        include_never_watched=True,
+        max_view_count=0,
+        max_vote_count=30,
+        max_popularity=5.0,
+        min_days_since_added=365,
+    ),
+    dict(
+        name="Template: movies not watched in 3+ years",
+        media_type=MediaType.MOVIE,
+        enabled=False,
+        include_never_watched=False,  # watched items only
+        min_days_since_last_watched=1095,  # 3 years
+    ),
+    dict(
+        name="Template: huge watched movies not touched in a year",
+        media_type=MediaType.MOVIE,
+        enabled=False,
+        include_never_watched=False,  # watched items only
+        min_size=15 * 1024 * 1024 * 1024,  # 15 GB
+        min_days_since_last_watched=365,
+    ),
+    dict(
+        name="Template: very old movies nobody's watched",
+        media_type=MediaType.MOVIE,
+        enabled=False,
+        include_never_watched=True,
+        max_view_count=0,
+        min_days_since_added=730,  # 2 years
+    ),
 ]
 
 # Fields on ReclaimRule that the template controls. When migrating a
