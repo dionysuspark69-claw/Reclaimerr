@@ -50,9 +50,9 @@
 
 <div class="p-2.5 md:p-8 max-w-7xl mx-auto space-y-6">
   <div class="space-y-2">
-    <h1 class="text-3xl font-bold text-foreground">Reclaim Space</h1>
+    <h1 class="text-3xl font-bold text-foreground">Free up space</h1>
     <p class="text-muted-foreground">
-      Everything you can free up right now, grouped by source.
+      Everything you can delete right now, grouped by source.
     </p>
   </div>
 

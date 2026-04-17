@@ -4,12 +4,17 @@
   import { Label } from "$lib/components/ui/label/index.js";
   import { Checkbox } from "$lib/components/ui/checkbox/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
+  import * as Select from "$lib/components/ui/select/index.js";
   import { get_api, put_api } from "$lib/api";
+  import { safeMode } from "$lib/stores/safe-mode";
   import { toast } from "svelte-sonner";
   import { Button } from "$lib/components/ui/button/index.js";
   import Save from "@lucide/svelte/icons/save";
   import Spinner from "$lib/components/ui/spinner/spinner.svelte";
-  import { type GeneralSettings } from "$lib/types/shared";
+  import {
+    type GeneralSettings,
+    type LibraryOption,
+  } from "$lib/types/shared";
 
   // props
   interface Props {
@@ -26,6 +31,13 @@
     workerPollMinSeconds: "",
     workerPollMaxSeconds: "",
   });
+  let safety = $state({
+    safeModeEnabled: true,
+    preferredLibraryId: "",
+  });
+  let libraries = $state<LibraryOption[]>([]);
+
+  const PREFERRED_NONE = "__none__";
 
   const parseOptionalSeconds = (value: string): number | null => {
     if (!value.trim()) return null;
@@ -41,6 +53,12 @@
       const validationError = validateCleanupTagSuffix();
       if (validationError) throw new Error(validationError);
 
+      const preferredLibraryId =
+        safety.preferredLibraryId === PREFERRED_NONE ||
+        !safety.preferredLibraryId
+          ? null
+          : safety.preferredLibraryId;
+
       // save settings to backend
       await put_api("/api/settings/general", {
         auto_tag_enabled: aarrTagging.autoTagEnabled,
@@ -51,7 +69,10 @@
         worker_poll_max_seconds: parseOptionalSeconds(
           aarrTagging.workerPollMaxSeconds,
         ),
+        safe_mode_enabled: safety.safeModeEnabled,
+        preferred_library_id: preferredLibraryId,
       });
+      safeMode.sync(safety.safeModeEnabled);
       toast.success("General settings saved");
     } catch (error) {
       console.error("Error saving general settings:", error);
@@ -125,7 +146,10 @@
 
   onMount(async () => {
     try {
-      const settings: GeneralSettings = await get_api("/api/settings/general");
+      const [settings, libs] = await Promise.all([
+        get_api<GeneralSettings>("/api/settings/general"),
+        get_api<LibraryOption[]>("/api/settings/libraries").catch(() => []),
+      ]);
       if (settings) {
         aarrTagging = {
           autoTagEnabled: settings.auto_tag_enabled,
@@ -135,7 +159,13 @@
           workerPollMaxSeconds:
             settings.worker_poll_max_seconds?.toString() ?? "",
         };
+        safety = {
+          safeModeEnabled: settings.safe_mode_enabled,
+          preferredLibraryId: settings.preferred_library_id ?? PREFERRED_NONE,
+        };
+        safeMode.sync(settings.safe_mode_enabled);
       }
+      libraries = Array.isArray(libs) ? libs : [];
     } catch (error) {
       console.error("Error fetching general settings:", error);
       toast.error("Failed to load general settings");
@@ -259,6 +289,75 @@
             bind:value={aarrTagging.workerPollMaxSeconds}
           />
         </div>
+      </div>
+    </div>
+
+    <!-- safety & duplicate preferences -->
+    <div class="bg-muted/50 border rounded-lg p-4 shadow-sm mt-6">
+      <h3 class="font-semibold text-foreground items-center mb-3">
+        Safety &amp; duplicate preferences
+      </h3>
+
+      <!-- safe mode toggle -->
+      <div class="flex gap-2 items-start mb-4">
+        <Checkbox
+          id="safeModeEnabled"
+          name="safeModeEnabled"
+          class="cursor-pointer mt-0.5"
+          bind:checked={safety.safeModeEnabled}
+        />
+        <Label
+          for="safeModeEnabled"
+          class="inline-flex flex-col items-start gap-1 cursor-pointer"
+        >
+          <span class="text-sm text-foreground">Enable safe mode</span>
+          <span class="text-xs text-muted-foreground font-normal">
+            Show a 5-second undo countdown after any delete action. Gives you
+            a chance to cancel an accidental click.
+          </span>
+        </Label>
+      </div>
+
+      <!-- preferred library -->
+      <div>
+        <Label for="preferredLibrary" class="mb-2">
+          <span class="text-sm text-foreground">Preferred library</span>
+        </Label>
+        <Select.Root
+          type="single"
+          bind:value={safety.preferredLibraryId}
+        >
+          <Select.Trigger
+            id="preferredLibrary"
+            class="input-hover-el text-foreground"
+          >
+            {#if safety.preferredLibraryId && safety.preferredLibraryId !== PREFERRED_NONE}
+              {libraries.find(
+                (l) => l.library_id === safety.preferredLibraryId,
+              )?.library_name ?? safety.preferredLibraryId}
+            {:else}
+              No preference
+            {/if}
+          </Select.Trigger>
+          <Select.Content>
+            <Select.Item value={PREFERRED_NONE} label="No preference">
+              No preference
+            </Select.Item>
+            {#each libraries as lib (lib.library_id)}
+              <Select.Item
+                value={lib.library_id}
+                label={lib.library_name}
+              >
+                {lib.library_name}
+              </Select.Item>
+            {/each}
+          </Select.Content>
+        </Select.Root>
+        <p class="mt-1 text-xs text-muted-foreground">
+          When a movie exists in multiple libraries, Reclaimerr will suggest
+          keeping the copy in this library. Resolution and file size still
+          apply as tie-breakers within other libraries.
+        </p>
       </div>
     </div>
 

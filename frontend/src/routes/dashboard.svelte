@@ -3,6 +3,7 @@
   import { push } from "svelte-spa-router";
   import { get_api, post_api } from "$lib/api";
   import ErrorBox from "$lib/components/error-box.svelte";
+  import { safeMode } from "$lib/stores/safe-mode";
   import { Button } from "$lib/components/ui/button/index.js";
   import { formatDate, formatDistanceToNow } from "$lib/utils/date";
   import { toast } from "svelte-sonner";
@@ -168,6 +169,7 @@
         loading = true;
       }
       dashboard = await get_api<DashboardResponse>("/api/dashboard");
+      safeMode.sync(dashboard.safe_mode_enabled);
       lastUpdatedAt = new Date().toISOString();
       error = "";
     } catch (err: any) {
@@ -294,7 +296,7 @@
                   class="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-md bg-primary
                     text-primary-foreground font-semibold group-hover:gap-3 transition-all"
                 >
-                  Review & reclaim
+                  Free up space
                   <TrendingUp class="size-5" />
                 </div>
               </div>

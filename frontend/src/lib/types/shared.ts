@@ -91,6 +91,8 @@ export interface GeneralSettings {
   cleanup_tag_suffix: string;
   worker_poll_min_seconds: number | null;
   worker_poll_max_seconds: number | null;
+  safe_mode_enabled: boolean;
+  preferred_library_id: string | null;
 }
 
 export interface ReclaimRule {
@@ -420,4 +422,11 @@ export interface DashboardResponse {
   activity: DashboardActivityItem[];
   viewer: DashboardViewer;
   media_server_configured: boolean;
+  safe_mode_enabled: boolean;
+}
+
+export interface LibraryOption {
+  library_id: string;
+  library_name: string;
+  media_type: string;
 }

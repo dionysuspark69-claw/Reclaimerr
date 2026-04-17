@@ -51,3 +51,4 @@ class DashboardResponse(BaseModel):
     activity: list[DashboardActivityItem]
     viewer: DashboardViewer
     media_server_configured: bool
+    safe_mode_enabled: bool = True

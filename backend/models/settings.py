@@ -89,6 +89,8 @@ class GeneralSettingsResponse(BaseModel):
     cleanup_tag_suffix: str
     worker_poll_min_seconds: float | None = None
     worker_poll_max_seconds: float | None = None
+    safe_mode_enabled: bool = True
+    preferred_library_id: str | None = None
 
     # metadata (only updated on PUT, not required on GET)
     updated_at: datetime | None = None

@@ -693,8 +693,11 @@ async def scan_duplicates_route(
     # Local import to avoid circular dependency at module load time.
     from backend.core.task_runtime import request_task_run
 
-    _, queued = await request_task_run(Task.FIND_DUPLICATES)
-    return {"queued": queued}
+    job, queued = await request_task_run(Task.FIND_DUPLICATES)
+    return {
+        "queued": queued,
+        "job_id": job.id if job is not None else None,
+    }
 
 
 @router.get("/duplicates", response_model=PaginatedDuplicatesResponse)

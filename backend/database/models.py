@@ -170,6 +170,14 @@ class GeneralSettings(Base):
     worker_poll_min_seconds: Mapped[float | None] = mapped_column(Float, default=None)
     worker_poll_max_seconds: Mapped[float | None] = mapped_column(Float, default=None)
 
+    # safe mode: wraps deletes with an undo countdown on the client
+    safe_mode_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # when choosing which copy of a duplicate to keep, prefer this library
+    preferred_library_id: Mapped[str | None] = mapped_column(
+        String(50), default=None
+    )
+
     # timestamps
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), init=False

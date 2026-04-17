@@ -12,6 +12,7 @@ from backend.database import async_db
 from backend.database.models import (
     DuplicateCandidate,
     DuplicateGroup,
+    GeneralSettings,
     Movie,
     MovieVersion,
     Series,
@@ -19,6 +20,10 @@ from backend.database.models import (
 )
 from backend.enums import MediaType, Task
 from backend.types import MEDIA_SERVERS
+
+# Priority boost applied when a version lives in the admin's preferred library.
+# Must dwarf resolution/size scores so the preferred library always wins.
+_PREFERRED_LIBRARY_BOOST = 1_000_000_000
 
 __all__ = ["scan_duplicates", "resolve_duplicate_groups"]
 
@@ -46,11 +51,14 @@ def _resolution_rank(resolution: str | None) -> int:
     return {"2160p": 4, "1080p": 3, "720p": 2, "480p": 1}.get(resolution or "", 0)
 
 
-def _score_movie_version(version: MovieVersion) -> tuple[float, str | None]:
+def _score_movie_version(
+    version: MovieVersion, preferred_library_id: str | None = None
+) -> tuple[float, str | None]:
     """Score a MovieVersion: higher = better candidate to keep.
 
     Default rule: highest resolution, tie-break on smallest size, then most
-    recently added.
+    recently added. If `preferred_library_id` matches, a huge constant boost
+    is added so the preferred library always wins regardless of resolution.
     """
     resolution = _detect_resolution(version.path)
     res_score = _resolution_rank(resolution) * 1_000_000
@@ -62,10 +70,17 @@ def _score_movie_version(version: MovieVersion) -> tuple[float, str | None]:
     added_score = 0.0
     if version.added_at is not None:
         added_score = version.added_at.timestamp() / 1_000_000
-    return res_score + size_score + added_score, resolution
+    preferred_score = (
+        _PREFERRED_LIBRARY_BOOST
+        if preferred_library_id and version.library_id == preferred_library_id
+        else 0
+    )
+    return res_score + size_score + added_score + preferred_score, resolution
 
 
-async def _scan_movies(db: AsyncSession) -> tuple[int, int]:
+async def _scan_movies(
+    db: AsyncSession, preferred_library_id: str | None = None
+) -> tuple[int, int]:
     """Scan movies for duplicates. Returns (groups_created, candidates_created)."""
     result = await db.execute(
         select(Movie)
@@ -93,7 +108,7 @@ async def _scan_movies(db: AsyncSession) -> tuple[int, int]:
             detection_kind = "multi_version"
 
         scored: list[tuple[MovieVersion, float, str | None]] = [
-            (v, *_score_movie_version(v)) for v in versions
+            (v, *_score_movie_version(v, preferred_library_id)) for v in versions
         ]
         scored.sort(key=lambda x: x[1], reverse=True)
         keep_id = scored[0][0].id
@@ -314,10 +329,14 @@ async def scan_duplicates() -> None:
     async with track_task_execution(Task.FIND_DUPLICATES):
         try:
             async with async_db() as db:
+                preferred = (
+                    await db.execute(select(GeneralSettings.preferred_library_id))
+                ).scalar_one_or_none()
+
                 await _clear_existing_groups(db)
                 await db.commit()
 
-                m_groups, m_cands = await _scan_movies(db)
+                m_groups, m_cands = await _scan_movies(db, preferred)
                 await db.commit()
 
                 s_groups, s_cands = await _scan_series(db)

@@ -9,7 +9,10 @@
   import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
   import * as Tooltip from "$lib/components/ui/tooltip/index.js";
   import { auth } from "$lib/stores/auth";
+  import { safeMode } from "$lib/stores/safe-mode";
+  import { safeDelete } from "$lib/utils/safe-delete";
   import {
+    BackgroundJobStatus,
     MediaType,
     UserRole,
     Permission,
@@ -43,6 +46,8 @@
   let error = $state("");
   let searchQuery = $state("");
   let scanning = $state(false);
+  let scanStatus = $state<string>("");
+  let scanPollTimer: ReturnType<typeof setTimeout> | null = null;
 
   const _sortByStore = createFilterState(
     "duplicates_sort_by",
@@ -160,17 +165,100 @@
     searchTimer = setTimeout(() => loadDuplicates(1), 400);
   };
 
+  interface ScanResponse {
+    queued: boolean;
+    job_id: number | null;
+  }
+
+  interface JobStatusResponse {
+    id: number;
+    status: BackgroundJobStatus;
+    error_message: string | null;
+  }
+
+  const stopScanPolling = () => {
+    if (scanPollTimer) {
+      clearTimeout(scanPollTimer);
+      scanPollTimer = null;
+    }
+  };
+
+  const pollScanJob = async (jobId: number) => {
+    try {
+      const job = await get_api<JobStatusResponse>(
+        `/api/tasks/background-jobs/${jobId}/status`,
+      );
+
+      if (job.status === BackgroundJobStatus.Completed) {
+        scanning = false;
+        scanStatus = "";
+        stopScanPolling();
+        toast.success("Duplicate scan complete.");
+        await loadDuplicates(currentPage);
+        return;
+      }
+
+      if (
+        job.status === BackgroundJobStatus.Failed ||
+        job.status === BackgroundJobStatus.Canceled
+      ) {
+        scanning = false;
+        scanStatus = "";
+        stopScanPolling();
+        toast.error(
+          job.error_message ??
+            (job.status === BackgroundJobStatus.Canceled
+              ? "Scan was canceled."
+              : "Scan failed."),
+        );
+        return;
+      }
+
+      scanStatus =
+        job.status === BackgroundJobStatus.Running ? "Scanning..." : "Queued...";
+      scanPollTimer = setTimeout(() => pollScanJob(jobId), 2000);
+    } catch (e: any) {
+      // stop polling on transient error; user can re-scan manually.
+      stopScanPolling();
+      scanning = false;
+      scanStatus = "";
+      toast.error(e.message ?? "Lost track of the scan job.");
+    }
+  };
+
   const triggerScan = async () => {
     scanning = true;
+    scanStatus = "Starting...";
+    stopScanPolling();
     try {
-      await post_api("/api/media/scan-duplicates", {});
-      toast.success(
-        "Duplicate scan queued — refresh the page in a moment to see results.",
+      const resp = await post_api<ScanResponse>(
+        "/api/media/scan-duplicates",
+        {},
+      );
+      if (!resp.queued && resp.job_id === null) {
+        toast.info("A duplicate scan is already running.");
+        scanning = false;
+        scanStatus = "";
+        return;
+      }
+      if (resp.job_id === null) {
+        // queued but no id returned — fall back to simple feedback.
+        toast.success(
+          "Duplicate scan queued — refresh the page in a moment to see results.",
+        );
+        scanning = false;
+        scanStatus = "";
+        return;
+      }
+      scanStatus = "Queued...";
+      scanPollTimer = setTimeout(
+        () => pollScanJob(resp.job_id as number),
+        1500,
       );
     } catch (e: any) {
       toast.error(e.message ?? "Failed to start scan.");
-    } finally {
       scanning = false;
+      scanStatus = "";
     }
   };
 
@@ -226,55 +314,63 @@
 
   const submitResolve = async () => {
     if (!resolveTarget) return;
+    const target = resolveTarget;
     resolveSubmitting = true;
-    try {
-      const resp = await post_api<ResolveResponse>(
-        "/api/media/duplicates/resolve",
-        { group_ids: [resolveTarget.id] },
-      );
-      if (resp.deleted > 0)
-        toast.success(
-          `Deleted ${resp.deleted} duplicate file${resp.deleted !== 1 ? "s" : ""}.`,
+    resolveDialogOpen = false;
+
+    await safeDelete({
+      safeMode: $safeMode,
+      label: target.title ?? "duplicate",
+      action: async () => {
+        const resp = await post_api<ResolveResponse>(
+          "/api/media/duplicates/resolve",
+          { group_ids: [target.id] },
         );
-      if (resp.failed > 0)
-        toast.error(
-          `${resp.failed} file${resp.failed !== 1 ? "s" : ""} could not be deleted.`,
-        );
-      if (resp.deleted > 0) await loadDuplicates(currentPage);
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to resolve duplicates.");
-    } finally {
-      resolveSubmitting = false;
-      resolveDialogOpen = false;
-      resolveTarget = null;
-    }
+        if (resp.deleted > 0)
+          toast.success(
+            `Deleted ${resp.deleted} duplicate file${resp.deleted !== 1 ? "s" : ""}.`,
+          );
+        if (resp.failed > 0)
+          toast.error(
+            `${resp.failed} file${resp.failed !== 1 ? "s" : ""} could not be deleted.`,
+          );
+        if (resp.deleted > 0) await loadDuplicates(currentPage);
+      },
+    });
+
+    resolveSubmitting = false;
+    resolveTarget = null;
   };
 
   const submitBulkResolve = async () => {
     if (selectedGroupEntries.length === 0) return;
+    const groups = selectedGroupEntries;
     bulkResolveSubmitting = true;
-    try {
-      const resp = await post_api<ResolveResponse>(
-        "/api/media/duplicates/resolve",
-        { group_ids: selectedGroupEntries.map((g) => g.id) },
-      );
-      if (resp.deleted > 0)
-        toast.success(
-          `Resolved ${resp.groups_resolved} group${resp.groups_resolved !== 1 ? "s" : ""} - ` +
-            `deleted ${resp.deleted} file${resp.deleted !== 1 ? "s" : ""}.`,
+    bulkResolveDialogOpen = false;
+
+    await safeDelete({
+      safeMode: $safeMode,
+      label: `${groups.length} duplicate group${groups.length !== 1 ? "s" : ""}`,
+      action: async () => {
+        const resp = await post_api<ResolveResponse>(
+          "/api/media/duplicates/resolve",
+          { group_ids: groups.map((g) => g.id) },
         );
-      if (resp.failed > 0)
-        toast.error(
-          `${resp.failed} file${resp.failed !== 1 ? "s" : ""} failed to delete.`,
-        );
-      if (resp.deleted > 0) await loadDuplicates(currentPage);
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to resolve duplicates.");
-    } finally {
-      bulkResolveSubmitting = false;
-      bulkResolveDialogOpen = false;
-      selectedGroups = new Set();
-    }
+        if (resp.deleted > 0)
+          toast.success(
+            `Resolved ${resp.groups_resolved} group${resp.groups_resolved !== 1 ? "s" : ""} - ` +
+              `deleted ${resp.deleted} file${resp.deleted !== 1 ? "s" : ""}.`,
+          );
+        if (resp.failed > 0)
+          toast.error(
+            `${resp.failed} file${resp.failed !== 1 ? "s" : ""} failed to delete.`,
+          );
+        if (resp.deleted > 0) await loadDuplicates(currentPage);
+      },
+    });
+
+    bulkResolveSubmitting = false;
+    selectedGroups = new Set();
   };
 
   const formatBytes = (bytes: number): string => {
@@ -285,9 +381,9 @@
   };
 
   const detectionLabel = (kind: string) => {
-    if (kind === "cross_library") return "Cross-library";
-    if (kind === "multi_version") return "Multiple versions";
-    if (kind === "mixed") return "Cross-library + versions";
+    if (kind === "cross_library") return "In multiple libraries";
+    if (kind === "multi_version") return "Multiple copies";
+    if (kind === "mixed") return "Multiple libraries + copies";
     return kind;
   };
 
@@ -306,6 +402,7 @@
   onDestroy(() => {
     if (searchTimer) clearTimeout(searchTimer);
     if (abortController) abortController.abort();
+    stopScanPolling();
   });
 </script>
 
@@ -395,7 +492,7 @@
       class="cursor-pointer"
     >
       <RefreshCw class="size-4 {scanning ? 'animate-spin' : ''}" />
-      {scanning ? "Scanning..." : "Scan now"}
+      {scanning ? (scanStatus || "Scanning...") : "Scan now"}
     </Button>
   </div>
 

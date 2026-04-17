@@ -10,6 +10,8 @@
   import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
   import { Label } from "$lib/components/ui/label/index.js";
   import { auth } from "$lib/stores/auth";
+  import { safeMode } from "$lib/stores/safe-mode";
+  import { safeDelete } from "$lib/utils/safe-delete";
   import {
     MediaType,
     UserRole,
@@ -338,61 +340,69 @@
 
   const submitSingleDelete = async () => {
     if (!deleteTarget) return;
+    const target = deleteTarget;
+    const label =
+      target.season_number != null
+        ? `S${String(target.season_number).padStart(2, "0")} of ` +
+          `${target.series_title ?? target.media_title}`
+        : target.media_title;
     deleteSubmitting = true;
-    try {
-      const resp = await post_api<DeleteResponse>(
-        "/api/media/candidates/delete",
-        { candidate_ids: [deleteTarget.id] },
-      );
-      if (resp.deleted > 0) {
-        const label =
-          deleteTarget.season_number != null
-            ? `S${String(deleteTarget.season_number).padStart(2, "0")} of ` +
-              `${deleteTarget.series_title ?? deleteTarget.media_title}`
-            : deleteTarget.media_title;
-        toast.success(`Deleted ${label}.`);
-        const remaining = data?.items.filter((i) => i.id !== deleteTarget!.id);
-        if (!remaining || (remaining.length === 0 && currentPage > 1)) {
-          await loadCandidates(currentPage - 1);
+    deleteDialogOpen = false;
+
+    await safeDelete({
+      safeMode: $safeMode,
+      label,
+      action: async () => {
+        const resp = await post_api<DeleteResponse>(
+          "/api/media/candidates/delete",
+          { candidate_ids: [target.id] },
+        );
+        if (resp.deleted > 0) {
+          toast.success(`Deleted ${label}.`);
+          const remaining = data?.items.filter((i) => i.id !== target.id);
+          if (!remaining || (remaining.length === 0 && currentPage > 1)) {
+            await loadCandidates(currentPage - 1);
+          } else {
+            removeCandidateIds(new Set([target.id]));
+          }
         } else {
-          removeCandidateIds(new Set([deleteTarget.id]));
+          toast.error(`Failed to delete.`);
         }
-      } else {
-        toast.error(`Failed to delete.`);
-      }
-      deleteDialogOpen = false;
-      deleteTarget = null;
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to delete candidate.");
-    } finally {
-      deleteSubmitting = false;
-    }
+      },
+    });
+
+    deleteSubmitting = false;
+    deleteTarget = null;
   };
 
   const submitBulkDelete = async () => {
     if (selectedEntries.length === 0) return;
+    const entries = selectedEntries;
     bulkDeleteSubmitting = true;
-    try {
-      const resp = await post_api<DeleteResponse>(
-        "/api/media/candidates/delete",
-        { candidate_ids: selectedEntries.map((e) => e.id) },
-      );
-      if (resp.deleted > 0)
-        toast.success(
-          `Deleted ${resp.deleted} item${resp.deleted !== 1 ? "s" : ""}.`,
+    bulkDeleteDialogOpen = false;
+
+    await safeDelete({
+      safeMode: $safeMode,
+      label: `${entries.length} item${entries.length !== 1 ? "s" : ""}`,
+      action: async () => {
+        const resp = await post_api<DeleteResponse>(
+          "/api/media/candidates/delete",
+          { candidate_ids: entries.map((e) => e.id) },
         );
-      if (resp.failed > 0)
-        toast.error(
-          `${resp.failed} item${resp.failed !== 1 ? "s" : ""} could not be deleted.`,
-        );
-      if (resp.deleted > 0) await loadCandidates(currentPage);
-    } catch (e: any) {
-      toast.error(e.message ?? "Failed to delete candidates.");
-    } finally {
-      bulkDeleteSubmitting = false;
-      bulkDeleteDialogOpen = false;
-      selectedIds = new Set();
-    }
+        if (resp.deleted > 0)
+          toast.success(
+            `Deleted ${resp.deleted} item${resp.deleted !== 1 ? "s" : ""}.`,
+          );
+        if (resp.failed > 0)
+          toast.error(
+            `${resp.failed} item${resp.failed !== 1 ? "s" : ""} could not be deleted.`,
+          );
+        if (resp.deleted > 0) await loadCandidates(currentPage);
+      },
+    });
+
+    bulkDeleteSubmitting = false;
+    selectedIds = new Set();
   };
 
   const handleRequestSuccess = (request: ProtectionRequest) => {
@@ -621,9 +631,9 @@
 
 <div class="p-2.5 md:p-8 max-w-7xl mx-auto space-y-4">
   <div class="space-y-2">
-    <h1 class="text-3xl font-bold text-foreground">Reclaim Candidates</h1>
+    <h1 class="text-3xl font-bold text-foreground">Cleanup candidates</h1>
     <p class="text-muted-foreground">
-      Media flagged for deletion based on your configured rules.
+      Media flagged for deletion by your rules or Tdarr.
       {#if canBulkSelect}
         Select multiple items for bulk actions.
       {/if}
