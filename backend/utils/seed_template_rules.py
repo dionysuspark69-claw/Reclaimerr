@@ -1,10 +1,16 @@
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from backend.core.logger import LOG
 from backend.database import async_db
 from backend.database.models import ReclaimRule
 from backend.enums import MediaType
 
+# Starter rules inserted on startup so new users have working examples.
+# Each entry is inserted only if no rule with the same `name` already
+# exists, so re-seeding is idempotent and user-created rules are never
+# touched. If a user deletes a template it will reappear on the next
+# startup — they can rename it (drop the "Template:" prefix) to opt
+# out of future re-seeds.
 _TEMPLATES: list[dict] = [
     dict(
         name="Template: low-rated movies nobody's watched",
@@ -26,15 +32,25 @@ _TEMPLATES: list[dict] = [
 
 
 async def seed_template_rules() -> int:
-    """Insert starter rules (disabled) only if the rules table is empty."""
+    """Insert any missing template rules (disabled by default)."""
     async with async_db() as session:
-        count = (
-            await session.execute(select(func.count(ReclaimRule.id)))
-        ).scalar_one()
-        if count and count > 0:
-            return 0
+        existing = (
+            await session.execute(
+                select(ReclaimRule.name).where(
+                    ReclaimRule.name.in_([tpl["name"] for tpl in _TEMPLATES])
+                )
+            )
+        ).scalars().all()
+        existing_names = set(existing)
+
+        inserted = 0
         for tpl in _TEMPLATES:
+            if tpl["name"] in existing_names:
+                continue
             session.add(ReclaimRule(**tpl))
-        await session.commit()
-        LOG.info(f"Seeded {len(_TEMPLATES)} template reclaim rules (disabled)")
-        return len(_TEMPLATES)
+            inserted += 1
+
+        if inserted:
+            await session.commit()
+            LOG.info(f"Seeded {inserted} template reclaim rules (disabled)")
+        return inserted
