@@ -5,6 +5,7 @@
   import CompactPagination from "$lib/components/compact-pagination.svelte";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
+  import { Badge } from "$lib/components/ui/badge/index.js";
   import * as Select from "$lib/components/ui/select/index.js";
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import * as AlertDialog from "$lib/components/ui/alert-dialog/index.js";
@@ -906,6 +907,17 @@
                   </div>
                 </td>
                 <td class="px-6 py-4 text-sm text-muted-foreground max-w-xs">
+                  <div class="flex flex-wrap gap-1 mb-1.5">
+                    {#if entry.source === "tdarr"}
+                      <Badge variant="outline" class="text-xs">Tdarr</Badge>
+                    {:else if entry.matched_rules.length > 0}
+                      {#each entry.matched_rules as rule}
+                        <Badge variant="secondary" class="text-xs">{rule.name}</Badge>
+                      {/each}
+                    {:else}
+                      <Badge variant="outline" class="text-xs">Rule removed</Badge>
+                    {/if}
+                  </div>
                   <span class="line-clamp-3">{entry.reason}</span>
                 </td>
                 <td class="px-6 py-4 text-sm text-foreground whitespace-nowrap">
@@ -1008,6 +1020,21 @@
                 </td>
                 <td class="px-6 py-4 text-sm text-muted-foreground">
                   {#if row.seriesEntry}
+                    <div class="flex flex-wrap gap-1 mb-1.5">
+                      {#if row.seriesEntry.source === "tdarr"}
+                        <Badge variant="outline" class="text-xs">Tdarr</Badge>
+                      {:else if row.seriesEntry.matched_rules.length > 0}
+                        {#each row.seriesEntry.matched_rules as rule}
+                          <Badge variant="secondary" class="text-xs"
+                            >{rule.name}</Badge
+                          >
+                        {/each}
+                      {:else}
+                        <Badge variant="outline" class="text-xs"
+                          >Rule removed</Badge
+                        >
+                      {/if}
+                    </div>
                     <span class="line-clamp-2">{row.seriesEntry.reason}</span>
                   {:else}
                     <span class="italic opacity-60"
@@ -1059,6 +1086,21 @@
                     <td
                       class="px-6 py-3 text-sm text-muted-foreground max-w-xs"
                     >
+                      <div class="flex flex-wrap gap-1 mb-1.5">
+                        {#if season.source === "tdarr"}
+                          <Badge variant="outline" class="text-xs">Tdarr</Badge>
+                        {:else if season.matched_rules.length > 0}
+                          {#each season.matched_rules as rule}
+                            <Badge variant="secondary" class="text-xs"
+                              >{rule.name}</Badge
+                            >
+                          {/each}
+                        {:else}
+                          <Badge variant="outline" class="text-xs"
+                            >Rule removed</Badge
+                          >
+                        {/if}
+                      </div>
                       <span class="line-clamp-2">{season.reason}</span>
                     </td>
                     <td

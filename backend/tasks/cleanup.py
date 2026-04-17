@@ -29,6 +29,7 @@ __all__ = [
     "tag_cleanup_candidates",
     "delete_cleanup_candidates",
     "delete_specific_candidates",
+    "preview_rule_matches",
 ]
 
 
@@ -792,6 +793,119 @@ def _evaluate_rule(
     if rule_reasons:
         reasons.append(f"{rule.name}: {', '.join(rule_reasons)}")
     return True
+
+
+async def preview_rule_matches(rule_id: int) -> dict[str, int]:
+    """Dry-run a single rule against current media and return match counts.
+
+    Does not write to the database. Used by the Rules UI to let admins
+    sanity-check a rule before enabling it (or between scheduled scans).
+
+    Returns {"movies": int, "series": int, "seasons": int, "total": int}.
+    For a movie rule, `series` and `seasons` are 0 and vice versa.
+    """
+    async with async_db() as db:
+        rule = (
+            await db.execute(select(ReclaimRule).where(ReclaimRule.id == rule_id))
+        ).scalar_one_or_none()
+        if rule is None:
+            raise ValueError(f"Rule {rule_id} not found")
+
+        now = datetime.now(timezone.utc)
+        movies_matched = 0
+        series_matched = 0
+        seasons_matched = 0
+
+        if rule.media_type is MediaType.MOVIE:
+            protected = await db.execute(
+                select(ProtectedMedia.movie_id).where(
+                    ProtectedMedia.media_type == MediaType.MOVIE,
+                    ProtectedMedia.movie_id.isnot(None),
+                    or_(
+                        ProtectedMedia.permanent.is_(True),
+                        ProtectedMedia.expires_at.is_(None),
+                        ProtectedMedia.expires_at > now,
+                    ),
+                )
+            )
+            protected_ids = {r[0] for r in protected.all()}
+
+            movies = (
+                await db.execute(
+                    select(Movie)
+                    .where(Movie.removed_at.is_(None))
+                    .options(selectinload(Movie.versions))
+                )
+            ).scalars().all()
+            for m in movies:
+                if m.id in protected_ids:
+                    continue
+                scratch_criteria: dict = {}
+                scratch_reasons: list[str] = []
+                if _evaluate_rule(m, rule, scratch_criteria, scratch_reasons):
+                    movies_matched += 1
+        else:
+            protected_series = await db.execute(
+                select(ProtectedMedia.series_id).where(
+                    ProtectedMedia.media_type == MediaType.SERIES,
+                    ProtectedMedia.series_id.isnot(None),
+                    ProtectedMedia.season_id.is_(None),
+                    or_(
+                        ProtectedMedia.permanent.is_(True),
+                        ProtectedMedia.expires_at.is_(None),
+                        ProtectedMedia.expires_at > now,
+                    ),
+                )
+            )
+            protected_series_ids = {r[0] for r in protected_series.all()}
+
+            protected_seasons = await db.execute(
+                select(ProtectedMedia.season_id).where(
+                    ProtectedMedia.media_type == MediaType.SERIES,
+                    ProtectedMedia.season_id.isnot(None),
+                    or_(
+                        ProtectedMedia.permanent.is_(True),
+                        ProtectedMedia.expires_at.is_(None),
+                        ProtectedMedia.expires_at > now,
+                    ),
+                )
+            )
+            protected_season_ids = {r[0] for r in protected_seasons.all()}
+
+            all_series = (
+                await db.execute(
+                    select(Series)
+                    .where(Series.removed_at.is_(None))
+                    .options(
+                        selectinload(Series.service_refs),
+                        selectinload(Series.seasons),
+                    )
+                )
+            ).scalars().all()
+
+            for s in all_series:
+                if s.id in protected_series_ids:
+                    continue
+                scratch_criteria = {}
+                scratch_reasons = []
+                if _evaluate_rule(s, rule, scratch_criteria, scratch_reasons):
+                    series_matched += 1
+                for season in s.seasons or []:
+                    if season.id in protected_season_ids:
+                        continue
+                    s_criteria: dict = {}
+                    s_reasons: list[str] = []
+                    if _evaluate_rule_for_season(
+                        s, season, rule, s_criteria, s_reasons
+                    ):
+                        seasons_matched += 1
+
+        return {
+            "movies": movies_matched,
+            "series": series_matched,
+            "seasons": seasons_matched,
+            "total": movies_matched + series_matched + seasons_matched,
+        }
 
 
 async def tag_cleanup_candidates() -> None:

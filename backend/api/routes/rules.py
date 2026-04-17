@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +20,16 @@ from backend.models.cleanup import (
     CleanupRuleResponse,
     CleanupRuleUpdate,
 )
+from backend.tasks.cleanup import preview_rule_matches
+
+
+class RulePreviewResponse(BaseModel):
+    """Counts produced by a dry-run evaluation of a single rule."""
+
+    movies: int
+    series: int
+    seasons: int
+    total: int
 
 router = APIRouter(prefix="/api", tags=["rules"])
 
@@ -125,6 +136,29 @@ async def delete_rule(
     msg = f"Deleted cleanup rule: {rule_name} (ID: {rule_id})"
     LOG.info(msg)
     return {"message": msg}
+
+
+@router.post("/rules/{rule_id}/preview", response_model=RulePreviewResponse)
+async def preview_rule(
+    rule_id: int,
+    _admin: Annotated[User, Depends(require_admin)],
+    db: AsyncSession = Depends(get_db),
+) -> RulePreviewResponse:
+    """Dry-run a single rule and return how many items it would pick up.
+
+    Does not write to the candidates table — this is a live preview so
+    admins can sanity-check a rule before enabling it or between scans.
+    """
+    rule = (
+        await db.execute(select(ReclaimRule).where(ReclaimRule.id == rule_id))
+    ).scalar_one_or_none()
+    if rule is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Rule with ID {rule_id} not found",
+        )
+    counts = await preview_rule_matches(rule_id)
+    return RulePreviewResponse(**counts)
 
 
 @router.get("/rules/check-synced")

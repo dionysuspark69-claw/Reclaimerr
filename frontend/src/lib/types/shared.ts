@@ -357,6 +357,11 @@ export interface PaginatedDuplicatesResponse {
   total_reclaimable_bytes: number;
 }
 
+export interface MatchedRuleRef {
+  id: number;
+  name: string;
+}
+
 export interface ReclaimCandidateEntry {
   id: number;
   media_type: MediaType;
@@ -365,6 +370,8 @@ export interface ReclaimCandidateEntry {
   media_year: number | null;
   poster_url: string | null;
   reason: string;
+  source: "rule" | "tdarr";
+  matched_rules: MatchedRuleRef[];
   estimated_space_gb: number | null;
   has_pending_request: boolean;
   created_at: string;
