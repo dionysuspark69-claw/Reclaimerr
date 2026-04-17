@@ -39,6 +39,7 @@ from backend.core.worker import worker_loop
 from backend.database import close_db, init_db
 from backend.scheduler import shutdown_scheduler, start_scheduler
 from backend.utils.create_admin import create_initial_admin
+from backend.utils.seed_template_rules import seed_template_rules
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -64,6 +65,9 @@ async def lifespan(app: FastAPI):
 
         # check if admin account needs created
         await create_initial_admin()
+
+        # seed starter rule templates (no-op if any rules already exist)
+        await seed_template_rules()
 
         # load service configs from database and initialize clients
         await load_enabled_services()
