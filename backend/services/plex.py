@@ -24,6 +24,7 @@ from backend.models.media import (
     MovieVersionData,
 )
 from backend.models.services.plex import PlexMovie, PlexSeries
+from backend.models.services.tautulli import PlexWatchSummary
 
 
 class PlexService:
@@ -90,6 +91,67 @@ class PlexService:
             LOG.debug(f"Deleted Plex item {rating_key}")
         except Exception as e:
             raise ValueError(f"Failed to delete Plex item {rating_key}: {e}")
+
+    async def get_watch_summaries(self) -> dict[str, PlexWatchSummary]:
+        """Aggregate Plex's global play history into per-ratingKey summaries.
+
+        Plex's per-item ``viewCount`` field in a library listing is scoped to
+        the authenticated user (the admin token here), so anything watched by
+        managed users / other Plex Home accounts looks unwatched to us.
+        ``/status/sessions/history/all`` is the admin-only endpoint that
+        returns plays across every user on the server — same shape as what
+        Tautulli exposes, so we can run it through the same overlay pipeline.
+
+        For TV episodes we key by ``grandparentRatingKey`` (show) so watch
+        counts accumulate at the series level, matching the Tautulli logic.
+        """
+        try:
+            data = await self._make_request(
+                "status/sessions/history/all",
+                params={"X-Plex-Container-Start": "0", "X-Plex-Container-Size": "50000"},
+            )
+        except Exception as e:
+            LOG.warning(f"Plex global history fetch failed: {e}")
+            return {}
+
+        if not isinstance(data, dict):
+            return {}
+        entries = data.get("MediaContainer", {}).get("Metadata", []) or []
+
+        counts: dict[str, int] = {}
+        last_dates: dict[str, datetime | None] = {}
+        for entry in entries:
+            entry_type = entry.get("type")
+            # episodes roll up to the show's ratingKey; movies stay on their own
+            if entry_type == "episode":
+                key = entry.get("grandparentRatingKey")
+            else:
+                key = entry.get("ratingKey")
+            if not key:
+                continue
+            key = str(key)
+
+            counts[key] = counts.get(key, 0) + 1
+            viewed_at = entry.get("viewedAt")
+            if viewed_at:
+                try:
+                    lva = datetime.fromtimestamp(int(viewed_at), tz=timezone.utc)
+                    prev = last_dates.get(key)
+                    if prev is None or lva > prev:
+                        last_dates[key] = lva
+                except (TypeError, ValueError, OSError):
+                    pass
+            elif key not in last_dates:
+                last_dates[key] = None
+
+        return {
+            key: PlexWatchSummary(
+                rating_key=key,
+                view_count=counts[key],
+                last_viewed_at=last_dates.get(key),
+            )
+            for key in counts
+        }
 
     async def scan_item_path(self, item_path: str) -> bool:
         """Scan a specific item path in Plex library.

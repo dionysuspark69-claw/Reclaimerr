@@ -889,32 +889,18 @@ async def sync_series(
         await tmdb_service.session.close()
 
 
-async def _overlay_tautulli_watch_data() -> None:
-    """Overlay Tautulli watch history on top of Plex's own view counts.
+async def _apply_watch_summaries(summaries: dict, source_label: str) -> int:
+    """Merge a ratingKey-keyed summaries dict into Movie/Series rows.
 
-    For each movie/series that Tautulli has a watch record for, take the
-    maximum view_count and the most-recent last_viewed_at between Plex's
-    stored values and Tautulli's values, then persist the winner.
-
-    Falls back silently when Tautulli is not configured.
+    Takes the max(view_count) and most-recent(last_viewed_at) between each
+    row's current value and the incoming summary, then persists. Used by
+    both the Plex global-history overlay and the Tautulli overlay.
     """
-    if not service_manager.tautulli:
-        return
-
-    LOG.info("Overlaying Tautulli watch data...")
-    try:
-        summaries = await service_manager.tautulli.get_watch_summaries()
-    except Exception as e:
-        LOG.warning(f"Tautulli overlay failed (continuing with Plex-only data): {e}")
-        return
-
     if not summaries:
-        LOG.debug("No Tautulli watch history available")
-        return
+        return 0
 
     updated = 0
     async with async_db() as session:
-        # --- Movies ---
         movie_rows = await session.execute(
             select(Movie, MovieVersion.service_item_id)
             .join(MovieVersion, Movie.id == MovieVersion.movie_id)
@@ -942,7 +928,6 @@ async def _overlay_tautulli_watch_data() -> None:
             if changed:
                 updated += 1
 
-        # --- Series ---
         series_rows = await session.execute(
             select(Series, SeriesServiceRef.service_id)
             .join(SeriesServiceRef, Series.id == SeriesServiceRef.series_id)
@@ -972,7 +957,50 @@ async def _overlay_tautulli_watch_data() -> None:
 
         await session.commit()
 
-    LOG.info(f"Tautulli overlay updated watch data for {updated} item(s)")
+    LOG.info(f"{source_label} overlay updated watch data for {updated} item(s)")
+    return updated
+
+
+async def _overlay_plex_global_history() -> None:
+    """Overlay Plex's cross-user play history on top of per-token view counts.
+
+    Plex's per-item ``viewCount`` in library listings is scoped to the
+    authenticated admin token, so anything watched by managed users / Plex
+    Home accounts shows as never_watched. The admin-only
+    ``/status/sessions/history/all`` endpoint returns plays across every user
+    on the server — we fold those into Movie/Series rows so rules that gate
+    on watch state reflect the household, not just the admin.
+    """
+    plex = service_manager.plex
+    if not plex:
+        return
+
+    LOG.info("Overlaying Plex global watch history...")
+    try:
+        summaries = await plex.get_watch_summaries()
+    except Exception as e:
+        LOG.warning(f"Plex global history overlay failed: {e}")
+        return
+
+    await _apply_watch_summaries(summaries, "Plex history")
+
+
+async def _overlay_tautulli_watch_data() -> None:
+    """Overlay Tautulli watch history on top of current view counts.
+
+    Falls back silently when Tautulli is not configured.
+    """
+    if not service_manager.tautulli:
+        return
+
+    LOG.info("Overlaying Tautulli watch data...")
+    try:
+        summaries = await service_manager.tautulli.get_watch_summaries()
+    except Exception as e:
+        LOG.warning(f"Tautulli overlay failed (continuing with Plex-only data): {e}")
+        return
+
+    await _apply_watch_summaries(summaries, "Tautulli")
 
 
 async def sync_media() -> dict[str, Any] | None:
@@ -1009,7 +1037,10 @@ async def sync_media() -> dict[str, Any] | None:
         # sync series
         await sync_series(main_server)  # type: ignore[reportArgumentType]
 
-        # overlay Tautulli watch data on top of Plex data (if configured)
+        # overlay Plex's global (cross-user) watch history, then Tautulli if present.
+        # Tautulli runs last so its counts win ties when both sources disagree,
+        # since it tracks partial plays more accurately than Plex's own history.
+        await _overlay_plex_global_history()
         await _overlay_tautulli_watch_data()
 
         return {"library_sync": library_sync_result}
