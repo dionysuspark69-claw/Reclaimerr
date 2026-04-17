@@ -115,14 +115,31 @@ class PlexService:
             return {}
 
         if not isinstance(data, dict):
+            LOG.warning(
+                f"Plex global history: unexpected response type {type(data).__name__}"
+            )
             return {}
-        entries = data.get("MediaContainer", {}).get("Metadata", []) or []
+        container = data.get("MediaContainer", {}) or {}
+        entries = container.get("Metadata", []) or []
+        LOG.info(
+            f"Plex global history: {len(entries)} raw entries "
+            f"(container size={container.get('size')}, totalSize={container.get('totalSize')})"
+        )
+        if entries:
+            sample = entries[0]
+            LOG.info(
+                f"Plex global history sample entry: type={sample.get('type')} "
+                f"ratingKey={sample.get('ratingKey')} "
+                f"grandparentRatingKey={sample.get('grandparentRatingKey')} "
+                f"viewedAt={sample.get('viewedAt')}"
+            )
 
         counts: dict[str, int] = {}
         last_dates: dict[str, datetime | None] = {}
+        type_counts: dict[str, int] = {}
         for entry in entries:
             entry_type = entry.get("type")
-            # episodes roll up to the show's ratingKey; movies stay on their own
+            type_counts[entry_type or "unknown"] = type_counts.get(entry_type or "unknown", 0) + 1
             if entry_type == "episode":
                 key = entry.get("grandparentRatingKey")
             else:
@@ -143,6 +160,11 @@ class PlexService:
                     pass
             elif key not in last_dates:
                 last_dates[key] = None
+
+        LOG.info(
+            f"Plex global history: entry types={type_counts}, "
+            f"distinct ratingKeys={len(counts)}"
+        )
 
         return {
             key: PlexWatchSummary(

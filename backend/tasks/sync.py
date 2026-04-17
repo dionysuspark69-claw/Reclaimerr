@@ -897,9 +897,20 @@ async def _apply_watch_summaries(summaries: dict, source_label: str) -> int:
     both the Plex global-history overlay and the Tautulli overlay.
     """
     if not summaries:
+        LOG.info(f"{source_label} overlay: no summaries to apply (empty input)")
         return 0
 
+    sample_keys = list(summaries.keys())[:5]
+    LOG.info(
+        f"{source_label} overlay: applying {len(summaries)} summaries "
+        f"(sample ratingKeys={sample_keys})"
+    )
+
     updated = 0
+    movies_seen = 0
+    movies_matched = 0
+    series_seen = 0
+    series_matched = 0
     async with async_db() as session:
         movie_rows = await session.execute(
             select(Movie, MovieVersion.service_item_id)
@@ -910,9 +921,11 @@ async def _apply_watch_summaries(summaries: dict, source_label: str) -> int:
             )
         )
         for movie, rating_key in movie_rows.all():
+            movies_seen += 1
             summary = summaries.get(str(rating_key))
             if not summary:
                 continue
+            movies_matched += 1
             lva = summary.last_viewed_at
             if lva is not None and lva.tzinfo is not None:
                 lva = lva.replace(tzinfo=None)
@@ -936,10 +949,15 @@ async def _apply_watch_summaries(summaries: dict, source_label: str) -> int:
                 Series.removed_at.is_(None),
             )
         )
+        sample_db_series_keys = []
         for series, rating_key in series_rows.all():
+            series_seen += 1
+            if len(sample_db_series_keys) < 5:
+                sample_db_series_keys.append(str(rating_key))
             summary = summaries.get(str(rating_key))
             if not summary:
                 continue
+            series_matched += 1
             lva = summary.last_viewed_at
             if lva is not None and lva.tzinfo is not None:
                 lva = lva.replace(tzinfo=None)
@@ -957,7 +975,11 @@ async def _apply_watch_summaries(summaries: dict, source_label: str) -> int:
 
         await session.commit()
 
-    LOG.info(f"{source_label} overlay updated watch data for {updated} item(s)")
+    LOG.info(
+        f"{source_label} overlay: movies seen={movies_seen} matched={movies_matched}, "
+        f"series seen={series_seen} matched={series_matched}, rows updated={updated}, "
+        f"sample DB series ratingKeys={sample_db_series_keys}"
+    )
     return updated
 
 
