@@ -11,3 +11,7 @@ class TautulliWatchSummary:
     rating_key: str
     view_count: int
     last_viewed_at: datetime | None
+
+
+# Generic alias — Plex's global-history overlay returns the same shape.
+PlexWatchSummary = TautulliWatchSummary
