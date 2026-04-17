@@ -25,6 +25,7 @@ from backend.enums import (
     BackgroundJobType,
     MediaType,
     ProtectionRequestStatus,
+    ReclaimSource,
     ScheduleType,
     Service,
     Task,
@@ -916,4 +917,30 @@ class BackgroundJob(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now(), init=False
+    )
+
+
+class ReclaimEvent(Base):
+    """Audit log of every reclaimed file — powers the Reports tab.
+
+    One row per physical file deletion. `bytes_reclaimed` is the freed file
+    size (0 when unknown); totals are simple SUMs over this table.
+    """
+
+    __tablename__ = "reclaim_events"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, init=False, autoincrement=True
+    )
+    source: Mapped[ReclaimSource] = mapped_column(Enum(ReclaimSource), index=True)
+    media_type: Mapped[MediaType] = mapped_column(Enum(MediaType))
+    media_title: Mapped[str] = mapped_column(String(512))
+    media_year: Mapped[int | None] = mapped_column(SmallInteger, default=None)
+    bytes_reclaimed: Mapped[int] = mapped_column(Integer, default=0)
+    triggered_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), default=None, index=True
+    )
+    notes: Mapped[str | None] = mapped_column(String(500), default=None)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), index=True, init=False
     )

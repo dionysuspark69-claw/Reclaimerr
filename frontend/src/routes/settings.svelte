@@ -20,11 +20,11 @@
   import CalendarClock from "@lucide/svelte/icons/calendar-clock";
   import Boxes from "@lucide/svelte/icons/boxes";
   import Server from "@lucide/svelte/icons/server";
-  import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
   import RadarrSVG from "$lib/components/svgs/RadarrSVG.svelte";
   import SonarrSVG from "$lib/components/svgs/SonarrSVG.svelte";
   import SeerrSVG from "$lib/components/svgs/SeerrSVG.svelte";
   import TautulliSVG from "$lib/components/svgs/TautulliSVG.svelte";
+  import TdarrSVG from "$lib/components/svgs/TdarrSVG.svelte";
   import BookAlert from "@lucide/svelte/icons/book-alert";
   import UserCog from "@lucide/svelte/icons/user-cog";
   import Filter from "@lucide/svelte/icons/filter";
@@ -110,7 +110,7 @@
         {
           id: SettingsTab.Tdarr,
           label: "Tdarr",
-          icon: HardDriveDownload,
+          icon: TdarrSVG,
           baseUrlPlaceholder: "e.g. http://localhost:8265",
           adminOnly: true,
         },

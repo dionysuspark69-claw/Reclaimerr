@@ -13,6 +13,7 @@
   import Candidates from "./routes/candidates.svelte";
   import Duplicates from "./routes/duplicates.svelte";
   import Reclaim from "./routes/reclaim.svelte";
+  import Reports from "./routes/reports.svelte";
   import Settings from "./routes/settings.svelte";
   import { Toaster } from "$lib/components/ui/sonner/index.js";
   import SystemAlerts from "$lib/components/system-alerts.svelte";
@@ -31,6 +32,7 @@
     "/candidates": Candidates,
     "/duplicates": Duplicates,
     "/reclaim": Reclaim,
+    "/reports": Reports,
     "/settings": Settings,
     "/setup": Setup,
   };
