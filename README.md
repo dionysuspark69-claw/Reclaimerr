@@ -38,8 +38,10 @@ As a result, this project will close pull requests that appear to be mostly or w
 - Supports both Jellyfin and/or Plex _(plan to support Emby in the future)_
   - Designate **one** server as the **main** server; supplemental data (such as watch history) is gathered from the other if using more than one media server
     **Note:** Both servers must manage the same physical media library
+- **Cross-user watch tracking**: aggregates watch history from all Plex users and Tautulli analytics
 - Configurable task scheduling (cron/time based)
 - Automatically scans media eligible for reclamation
+- **Duplicate finder**: identify and resolve duplicate copies across libraries with resolution/quality scoring
 - Media library items **protection** system
   - This system adds "protection" that will prevent them from being considered for deletion
   - Users can request protection (to be approved or denied by users with appropriate permissions)
